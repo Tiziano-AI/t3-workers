@@ -1,0 +1,13 @@
+{
+  "name": "t3-workers",
+  "version": "0.1.0-alpha.1",
+  "description": "Orchestrate visible T3 workers from a native Codex or Claude Code chief.",
+  "author": {
+    "name": "Tiziano AI",
+    "url": "https://github.com/Tiziano-AI"
+  },
+  "homepage": "https://github.com/Tiziano-AI/t3-workers",
+  "repository": "https://github.com/Tiziano-AI/t3-workers",
+  "license": "MIT",
+  "keywords": ["t3-code", "agents", "orchestration", "codex", "claude"]
+}

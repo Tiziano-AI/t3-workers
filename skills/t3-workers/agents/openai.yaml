@@ -1,0 +1,4 @@
+interface:
+  display_name: "T3 Workers"
+  short_description: "Operate and recover your T3 worker fleet"
+  default_prompt: "Use $t3-workers to assign a bounded task to my T3 fleet and bring back its result."
