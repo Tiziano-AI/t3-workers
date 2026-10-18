@@ -20,10 +20,17 @@ must stay alive, and there is no new gateway, state registry or scheduler.
 
 ## Packaging and connectivity
 
-Codex consumes the portable root `plugin.json` and native marketplace at
-`.agents/plugins/marketplace.json`. Claude Code uses the thin
-`.claude-plugin/plugin.json` and its marketplace. Both discover the same root
-`skills/` tree. There is no host-specific copy of the operating instructions.
+Codex consumes the portable root `plugin.json`; Claude Code uses the thin
+`.claude-plugin/plugin.json`. Both discover the same root `skills/` tree.
+There is no host-specific copy of the operating instructions.
+
+The publisher marketplace lives in
+[`Tiziano-AI/plugins`](https://github.com/Tiziano-AI/plugins) and is named
+`tiziano-ai` in both hosts. Its native catalogs reference this independent
+GitHub repository as the plugin source. Marketplace name, catalog repository
+and plugin repository are separate identities: the installation ID is
+`t3-workers@tiziano-ai`. This repository carries no marketplace, and the catalog
+carries no copied plugin resources.
 
 Connectivity is deliberately **user-managed**, not bundled. A fixed loopback
 URL would assume one deployment. A plugin-namespaced connection can coexist
@@ -70,30 +77,32 @@ commands, auth boundaries, fields, exits and exact released source links.
 
 Primary packaging sources:
 
-- [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
+- [OpenAI plugin packaging and external marketplace sources](https://developers.openai.com/plugins/build/plugins#marketplace-metadata)
   and [desktop-only skills](https://developers.openai.com/plugins/deploy/desktop-only#plugins-without-an-mcp-server).
 - [Native Codex plugin commands](https://learn.chatgpt.com/docs/developer-commands#codex-plugin).
 - [Claude components](https://code.claude.com/docs/en/plugins/components),
-  [marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) and
+  [external marketplace sources](https://code.claude.com/docs/en/plugin-marketplaces#choose-a-plugin-source) and
   [loading/version behavior](https://code.claude.com/docs/en/plugins/loading#versions-and-updates).
 - [Released T3 outside-agent contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/outside-agents.md).
 
 ## Qualification
 
-The initial package is **0.1.0-alpha.1**, targeting the released T3 0.1.0
-contract. Schema/source checks, host loading, authentication and successful
-worker execution are different claims. Public availability does not imply all
-of them passed.
+The current package is **0.1.0-alpha.2**, targeting the released T3 0.1.0
+contract. It moves catalog ownership to the publisher marketplace without
+changing the shared skill or quota command. Schema/source checks, catalog
+fetching, host loading, authentication and successful worker execution are
+different claims. Public availability does not imply all of them passed.
 
-Observed on 18 October 2026: portable manifest schema and both native Claude
-manifest/marketplace validators passed. The app-bundled Codex CLI
-`0.163.0-alpha.10.2` accepted the marketplace and installed/enabled the package
-in an isolated home, including the shared skill and resources. This establishes
-native package acceptance, not selection or use in an interactive chief. The
-quota command passed a real snapshot read on T3 0.1.0/protocol 2 across Codex,
-Claude and Grok instances; its explicitly authorized temporary read-only
-session was revoked and absence verified. No refresh, provider inference or
-live user-home plugin installation was part of that check.
+The unchanged quota command passed a real snapshot read on 18 October 2026
+against T3 0.1.0/protocol 2 across Codex, Claude and Grok instances. Its
+explicitly authorized temporary read-only session was revoked and absence
+verified. No refresh, provider inference or live user-home plugin installation
+was part of that check.
+
+Use the publisher catalog's native installation path to check delivery of this
+package. Isolated package acceptance establishes that the client can install
+its resources, not selection or use in an interactive chief. Do not infer a
+successful worker cycle from packaging checks or the quota read.
 
 Before calling a host integration qualified, demonstrate these outcomes in an
 explicitly scoped environment:

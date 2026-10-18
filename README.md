@@ -12,21 +12,25 @@ workers and their conversations. This plugin supplies the operating method,
 MCP onboarding and the consequential lessons between them—not another server.
 A small, optional command reads T3's own per-account quota snapshots.
 
-**Status: development bootstrap, `0.1.0-alpha.1`.** The package targets T3's
+**Status: development bootstrap, `0.1.0-alpha.2`.** The package targets T3's
 released outside-agent MCP, available from **T3 0.1.0**. Publication is not a
 claim that both hosts, every provider or every recovery path have passed live
 qualification. See [architecture and qualification](docs/architecture.md).
 
 ## Install
 
-Use a current native client with plugin support. There is one shared skill,
-exposed through each host's own manifest and marketplace.
+Use a current native client with plugin support. The publisher marketplace is
+[`Tiziano-AI/plugins`](https://github.com/Tiziano-AI/plugins), named
+`tiziano-ai` in both hosts. Its native catalogs point to this independent
+`Tiziano-AI/t3-workers` repository; they do not copy its resources. This
+repository contains the two native plugin manifests and one shared skill, not
+a second marketplace.
 
 ### Codex
 
 ```sh
-codex plugin marketplace add Tiziano-AI/t3-workers
-codex plugin add t3-workers@t3-workers
+codex plugin marketplace add Tiziano-AI/plugins
+codex plugin add t3-workers@tiziano-ai
 ```
 
 Use the CLI belonging to your intended Codex installation. A desktop app's
@@ -39,8 +43,8 @@ that the chat loaded it.
 ### Claude Code
 
 ```sh
-claude plugin marketplace add Tiziano-AI/t3-workers
-claude plugin install t3-workers@t3-workers --scope user
+claude plugin marketplace add Tiziano-AI/plugins
+claude plugin install t3-workers@tiziano-ai --scope user
 ```
 
 Run `/reload-plugins` where supported, or start a new session. The explicit
@@ -132,19 +136,19 @@ polling daemon.
 For Codex:
 
 ```sh
-codex plugin marketplace upgrade t3-workers
-codex plugin add t3-workers@t3-workers
+codex plugin marketplace upgrade tiziano-ai
+codex plugin add t3-workers@tiziano-ai
 # Remove only this plugin when desired:
-codex plugin remove t3-workers@t3-workers
+codex plugin remove t3-workers@tiziano-ai
 ```
 
 For Claude Code:
 
 ```sh
-claude plugin marketplace update t3-workers
-claude plugin update t3-workers@t3-workers --scope user
+claude plugin marketplace update tiziano-ai
+claude plugin update t3-workers@tiziano-ai --scope user
 # Remove only this plugin when desired:
-claude plugin uninstall t3-workers@t3-workers --scope user
+claude plugin uninstall t3-workers@tiziano-ai --scope user
 ```
 
 Reload the supported host or start a new session and check the selected version.
@@ -163,7 +167,8 @@ claude plugin validate --strict .
 claude plugin validate --strict .claude-plugin/plugin.json
 ```
 
-These check package structure and synthetic quota-protocol cases, not live
+These check this repository's manifests, delivered resources and synthetic
+quota-protocol cases, not the external catalog's fetch/install path or live
 worker success. None installs the plugin or launches a worker. For local Claude
 development without installation, use
 `claude --plugin-dir /absolute/path/to/t3-workers`; that starts

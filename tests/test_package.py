@@ -1,4 +1,4 @@
-"""Offline checks of the resources delivered by both native marketplaces."""
+"""Offline checks of this plugin's native manifests and shared resources."""
 
 import json
 from pathlib import Path
@@ -15,22 +15,15 @@ def read_json(path):
 
 
 class PackageTests(unittest.TestCase):
-    def test_both_marketplaces_deliver_the_same_plugin_root(self):
-        codex = read_json(".agents/plugins/marketplace.json")
-        claude = read_json(".claude-plugin/marketplace.json")
-        self.assertEqual(len(codex["plugins"]), 1)
-        self.assertEqual(len(claude["plugins"]), 1)
-        entry = codex["plugins"][0]
-        self.assertEqual(entry["source"]["source"], "local")
-        for catalog, source in (
-            (codex, entry["source"]["path"]),
-            (claude, claude["plugins"][0]["source"]),
-        ):
-            with self.subTest(catalog=catalog["name"]):
-                plugin_root = (ROOT / source).resolve()
-                self.assertEqual(plugin_root, ROOT)
-                self.assertTrue((plugin_root / "skills/t3-workers/SKILL.md").is_file())
-                self.assertEqual(catalog["plugins"][0]["name"], "t3-workers")
+    def test_package_delivers_the_shared_skill_and_quota_reader(self):
+        manifest = read_json("plugin.json")
+        skill_root = ROOT / "skills" / manifest["name"]
+        skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+        self.assertRegex(skill, rf"\A---\nname: {re.escape(manifest['name'])}\n")
+        for resource in ("agents/openai.yaml", "scripts/t3-limits.mjs"):
+            with self.subTest(resource=resource):
+                self.assertTrue((skill_root / resource).is_file())
+                self.assertGreater((skill_root / resource).stat().st_size, 0)
 
     def test_shared_manifest_identity_and_release(self):
         portable = read_json("plugin.json")

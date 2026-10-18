@@ -26,8 +26,11 @@ This is public source. No personal account mappings, workstation paths,
 credentials, transcripts, raw runtime captures or private deployment details
 belong here. Use portable examples and primary-source links.
 
-The canonical skill is under `skills/t3-workers/`. Host manifests and
-marketplaces expose that same source; do not maintain host-specific copies.
+The canonical skill is under `skills/t3-workers/`. The native manifests expose
+that same source; do not maintain host-specific copies. The publisher catalog
+is `Tiziano-AI/plugins`, named `tiziano-ai` in both hosts, and references this
+independent plugin repository. Keep marketplace metadata there, not here;
+neither repository copies the other's resources or bundles a T3 connection.
 The README owns installation and first use; architecture and qualification
 belong in `docs/`. Keep installation, source validation, runtime discovery and
 successful worker execution as distinct claims.
