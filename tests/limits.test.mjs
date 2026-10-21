@@ -19,7 +19,7 @@ const provider = () => ({
   },
   models: [{ secret: TOKEN }], runtimePaths: { home: '/private/home' }, config: { token: TOKEN },
 });
-const config = () => ({ environment: { ...descriptor }, providers: [provider()], externalUsage: [{ token: TOKEN }], skills: [{ secret: TOKEN }] });
+const config = (serverVersion = '0.1.0') => ({ environment: { ...descriptor, serverVersion }, providers: [provider()], externalUsage: [{ token: TOKEN }], skills: [{ secret: TOKEN }] });
 
 function harness({ getConfig = config, reply, ticketStatus = 200, discovery = descriptor, hang = false, failConnect = false, ticketHang = false } = {}) {
   const http = [], requests = [], sockets = [];
@@ -87,9 +87,11 @@ test('invalid percentages, protocol drift, and missing selected instance are mea
   assert.throws(() => normalizeConfig(config(), { instanceId: 'missing' }), { code: 'INSTANCE_NOT_FOUND' });
 });
 
-test('snapshot discovers unauthenticated identity before ticket and uses native Effect requests', async () => {
-  const h = harness();
+for (const serverVersion of ['0.1.0', '0.1.1']) test(`T3 ${serverVersion} snapshot discovers unauthenticated identity before ticket and uses native Effect requests`, async () => {
+  const h = harness({ discovery: { ...descriptor, serverVersion }, getConfig: () => config(serverVersion) });
   const result = await readLimits({ ...h.options, environmentId: descriptor.environmentId });
+  assert.equal(result.schemaVersion, 1);
+  assert.equal(result.source.serverVersion, serverVersion);
   assert.equal(h.http.length, 2);
   assert.equal(h.http[0].options.headers, undefined);
   assert.equal(h.http[1].options.headers.Authorization, `Bearer ${TOKEN}`);
@@ -150,21 +152,39 @@ test('omitting an instance deliberately permits an all-provider refresh', async 
 });
 
 test('unqualified or wrong environment descriptor prevents bearer transmission', async () => {
-  for (const discovery of [{ ...descriptor, serverVersion: '0.2.0' }, { ...descriptor, orchestrationProtocolVersion: undefined }]) {
+  for (const discovery of [
+    ...['0.1.2', '0.2.0', '0.1.1-nightly.1', undefined].map(serverVersion => ({ ...descriptor, serverVersion })),
+    ...[1, 3, undefined].map(orchestrationProtocolVersion => ({ ...descriptor, orchestrationProtocolVersion })),
+  ]) {
     const h = harness({ discovery });
     await assert.rejects(readLimits(h.options), { code: 'UNQUALIFIED_SERVER' });
     assert.equal(h.http.length, 1);
+    assert.equal(h.http[0].options.headers, undefined);
     assert.equal(h.sockets.length, 0);
   }
   const h = harness();
   await assert.rejects(readLimits({ ...h.options, environmentId: 'another-environment' }), { code: 'ENVIRONMENT_MISMATCH' });
   assert.equal(h.http.length, 1);
+  assert.equal(h.http[0].options.headers, undefined);
+  assert.equal(h.sockets.length, 0);
 });
 
 test('getConfig must agree with pre-auth discovery', async () => {
   const h = harness({ getConfig: () => ({ ...config(), environment: { ...descriptor, environmentId: 'changed' } }) });
   await assert.rejects(readLimits(h.options), { code: 'ENVIRONMENT_MISMATCH' });
   assert.equal(h.sockets[0].closed, true);
+});
+
+test('getConfig independently rejects unqualified versions or protocols before refresh', async () => {
+  for (const environment of [
+    { ...descriptor, serverVersion: '0.1.2' },
+    { ...descriptor, serverVersion: '0.1.1', orchestrationProtocolVersion: 3 },
+  ]) {
+    const h = harness({ getConfig: () => ({ ...config(), environment }) });
+    await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'UNQUALIFIED_SERVER' });
+    assert.deepEqual(h.requests.map(request => request.tag), ['server.getConfig']);
+    assert.equal(h.sockets[0].closed, true);
+  }
 });
 
 test('HTTP error does not print response bodies or make a websocket connection', async () => {
