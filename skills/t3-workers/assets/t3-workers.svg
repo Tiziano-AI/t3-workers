@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <title>T3 Workers</title>
+  <desc>Editable vector artwork for the Tiziano AI plugin family. The adjacent PNG is rendered from this source at 512 by 512 pixels.</desc>
+  <rect width="128" height="128" rx="28" fill="#2348AA"/>
+  <path d="M44 64h13c7 0 11-5 11-12V41c0-7 5-12 12-12h6M44 64h13c7 0 11 5 11 12v11c0 7 5 12 12 12h6" stroke="#F8F0DE" stroke-width="10"/>
+  <rect x="20" y="50" width="28" height="28" rx="4" fill="#F0B06E"/>
+  <rect x="84" y="17" width="28" height="28" rx="4" fill="#F8F0DE"/>
+  <rect x="84" y="83" width="28" height="28" rx="4" fill="#F8F0DE"/>
+</svg>

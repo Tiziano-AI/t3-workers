@@ -1,13 +1,14 @@
 {
   "name": "t3-workers",
-  "version": "0.1.0-alpha.2",
-  "description": "Orchestrate visible T3 workers from a native Codex or Claude Code chief.",
+  "version": "0.1.0-alpha.3",
+  "description": "Delegate tasks to visible T3 workers from Codex or Claude Code.",
   "author": {
     "name": "Tiziano AI",
     "url": "https://github.com/Tiziano-AI"
   },
   "homepage": "https://github.com/Tiziano-AI/t3-workers",
   "repository": "https://github.com/Tiziano-AI/t3-workers",
+  "icon": "./skills/t3-workers/assets/t3-workers.png",
   "license": "MIT",
   "keywords": ["t3-code", "agents", "orchestration", "codex", "claude"]
 }

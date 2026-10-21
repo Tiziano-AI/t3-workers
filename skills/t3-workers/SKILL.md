@@ -5,10 +5,11 @@ description: "Operate a T3 Code worker fleet from an external Codex or Claude Co
 
 # T3 Workers
 
-Keep the user's conversation and judgment in this chief. Use T3's supported
-MCP tools directly to execute bounded commissions in persistent, visible
-workers. T3 owns worker execution and conversations; this package supplies the
-operating method, not another gateway, scheduler, memory store, or coordinator.
+The **chief** is the Codex or Claude Code agent coordinating this assignment.
+Keep the user's conversation and judgment here. Use T3's supported MCP tools
+directly to execute bounded commissions in persistent, visible workers. T3
+owns worker execution and conversations; this package supplies the operating
+method, not another gateway, scheduler, memory store, or coordinator.
 
 ## Choose the right route
 
@@ -64,25 +65,26 @@ across providers are not equivalent token budgets, and another thread does not
 create more account capacity.
 
 Use a suitable native structured capacity tool if the connected release
-exposes one. T3 **v0.1.0** does not expose this through outside-agent MCP. This
-package's optional reader uses the native client RPC instead:
+exposes one. Released T3 **v0.1.0 and v0.1.1** do not expose this through
+outside-agent MCP. This package's optional reader uses the native client RPC instead:
 
 ```sh
-node <this-skill-directory>/scripts/t3-limits.mjs --json
+node "/absolute/path/to/installed/skills/t3-workers/scripts/t3-limits.mjs" --json
 ```
 
-Read [Quota reader](references/limits.md) before first use: it requires Node.js
+Replace the example path with this installed skill's directory. Read
+[Quota reader](references/limits.md) before first use: it requires Node.js
 22.15+ and an explicitly supplied normal T3 read-only session, **not** the MCP
 OAuth credential. Do not issue a session as an unrequested preflight. Default
 to published snapshots; `--refresh` explicitly requests native status probes.
-The reader is qualified only for 0.1.0/protocol 2 and covers native provider
+The reader accepts exactly 0.1.0 and 0.1.1/protocol 2 and covers native provider
 instances, not pooled external usage sources. Use the authenticated
 **Usage → Limits** UI when the reader is unavailable. Keep unknown capacity
 unknown; do not treat it as zero or unlimited, or block an authorized bounded
 task solely because quota is unavailable. Explain consequential uncertainty
 before a capacity-sensitive assignment.
 
-Check freshness and failure information, not just bars. The v0.1.0 UI can
+Check freshness and failure information, not just bars. Native snapshots can
 retain last-good limits after a probe failure **without publishing that latest
 failure**; opening Limits can trigger native status probes, and refresh can
 still use cached data. Do not repeatedly poll to manufacture certainty.
@@ -174,9 +176,12 @@ a separately supported and authorized wake-up mechanism has been established.
 
 ## Contract boundary
 
-The launch/recovery method and quota limitation above are grounded in T3's
+The launch/recovery method above is grounded in T3's
 [released v0.1.0 outside-agent contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/outside-agents.md)
 and [usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/usage.md).
+The reader's additional quota support uses the released
+[v0.1.1 native usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.1/packages/contracts/src/providerUsageLimits.ts);
+see its reference for the separate session and freshness boundaries.
 Use current callable schemas for syntax and newly supported capabilities;
 neither this skill nor a pinned catalog proves what this host can invoke.
 Use [Connect the chief](references/setup.md) for installation and OAuth, not

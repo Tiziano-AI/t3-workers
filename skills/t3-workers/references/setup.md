@@ -46,22 +46,27 @@ bundled Codex and an unrelated `codex` on PATH can differ. An account switch,
 another runtime home and another machine are not the same change: inspect the
 current connection before deciding any credentials are missing.
 
-For a **new** user-managed connection, substitute the exact URL:
+For a **new** user-managed connection, substitute the exact URL and run only
+the block for the intended chief. Do not overwrite an existing `t3`
+registration without resolving its owner.
+
+**Codex**
 
 ```sh
 T3_MCP_URL='http://127.0.0.1:3773/mcp'
-
-# Codex
 codex mcp add t3 --url "$T3_MCP_URL"
 codex mcp login t3
+```
 
-# OR Claude Code
+**Claude Code**
+
+```sh
+T3_MCP_URL='http://127.0.0.1:3773/mcp'
 claude mcp add --transport http --scope user t3 "$T3_MCP_URL"
 claude mcp login t3
 ```
 
-Do not run both blocks for one chief or overwrite an existing `t3` registration
-without resolving its owner. Claude can also initiate consent through `/mcp`.
+Claude Code can also initiate consent through `/mcp`.
 Use the client's supported browserless flow if appropriate; do not manufacture
 OAuth callbacks or paste secrets into chat. See [T3 outside-agent setup](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/outside-agents.md),
 [native Codex MCP](https://learn.chatgpt.com/docs/extend/mcp#connect-an-existing-mcp-server)
@@ -109,8 +114,7 @@ If tools are missing, distinguish these cases before changing anything:
 | Authentication or scope is rejected | Inspect the exact connection/grant and native login state; do not substitute accounts. |
 | Client reports a protocol mismatch | Identify the server/client owner and follow T3's update guidance; no blind reinstall or data-root switch. |
 
-Do not invent a per-server Restart button. Use only the refresh controls the
-current host actually offers; an application restart, if necessary, affects
+Use the refresh controls the current host offers. An application restart affects
 the user's other work and is a separate operational action.
 
 Installing, disabling or removing this plugin leaves the

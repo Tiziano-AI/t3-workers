@@ -2,8 +2,10 @@
 
 Read this when deciding whether T3 fits an assignment, interpreting quota, or
 explaining what remote access and returned results actually provide. The
-baseline below is **released T3 v0.1.0**, not an assertion that later versions
-are identical. Use the connected tool schemas for current syntax and exposure.
+outside-agent baseline below is **released T3 v0.1.0**; quota support has also
+been checked through **released v0.1.1**. This does not assert that other later
+contracts are identical. Use the connected tool schemas for current syntax
+and exposure.
 
 ## What each side owns
 
@@ -26,10 +28,10 @@ catalog presence is not provider health or spare quota. Use the selected
 instance's advertised option IDs; an effort or tier supported by one driver
 need not exist on another.
 
-**Outside-agent MCP in v0.1.0 has no quota/usage read.** The bundled
+**Outside-agent MCP through released v0.1.1 has no quota/usage read.** The bundled
 [quota reader](limits.md) reads T3's native provider snapshots through its
 client RPC with a separately authorized environment session. It is qualified
-only for 0.1.0/protocol 2, not a promised stable third-party API. The
+for exactly 0.1.0 and 0.1.1/protocol 2, not a promised stable third-party API. The
 authenticated **Usage → Limits** UI remains the fallback and can also include
 pooled/external usage sources outside the reader's coverage. Available windows
 depend on the provider/auth path:
@@ -42,10 +44,14 @@ depend on the provider/auth path:
 Opening Limits can run these non-inference probes. A failed probe can leave
 last-good percentages and their older `checkedAt`, hiding the latest failure;
 even a refresh can reuse cached data. Preserve the window, account, observation
-date and any published failure, not just a colored bar. A full session window does not override an exhausted weekly
-window. Do not add percentages across providers or treat them as comparable
-token budgets. Unknown allowance is neither zero nor unlimited. See the
+date and any published failure, not just a colored bar. A full session window
+does not override an exhausted weekly window. Do not add percentages across
+providers or treat them as comparable token budgets. Unknown allowance is
+neither zero nor unlimited. See the
 [released usage guide](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/usage.md#L79-L122).
+The reader's additional 0.1.1 qualification uses the
+[released native quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.1/packages/contracts/src/providerUsageLimits.ts)
+and does not expand its scope to pooled sources or imply fresh provider probes.
 
 There is no automatic capacity router or reset mechanism in this package.
 Capacity can inform an authorized choice; it does not authorize silently

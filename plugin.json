@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "t3-workers",
-  "version": "0.1.0-alpha.2",
-  "description": "Orchestrate visible T3 workers from a native Codex or Claude Code chief.",
+  "version": "0.1.0-alpha.3",
+  "description": "Delegate tasks to visible T3 workers from Codex or Claude Code.",
   "author": {
     "name": "Tiziano AI",
     "url": "https://github.com/Tiziano-AI"
@@ -16,9 +16,12 @@
       "requires_local_executor": true,
       "interface": {
         "displayName": "T3 Workers",
-        "shortDescription": "Orchestrate your T3 fleet",
+        "shortDescription": "Delegate to your T3 workers",
         "developerName": "Tiziano AI",
         "category": "Productivity",
+        "composerIcon": "./skills/t3-workers/assets/t3-workers.svg",
+        "logo": "./skills/t3-workers/assets/t3-workers.png",
+        "brandColor": "#2348AA",
         "defaultPrompt": [
           "Use T3 Workers to inspect my connected fleet before assigning work.",
           "Use T3 Workers to delegate this task and bring back the actual result."

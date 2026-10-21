@@ -2,20 +2,21 @@
 
 Use `scripts/t3-limits.mjs` relative to this skill's directory when the chief
 needs structured native-provider allowance. It requires **Node.js 22.15+**,
-T3 **0.1.0 / orchestration protocol 2**, and a caller-supplied environment
+T3 **0.1.0 or 0.1.1 / orchestration protocol 2**, and a caller-supplied environment
 bearer session with `orchestration:read`. There are no npm dependencies or
-global installation. This is a version-qualified client of T3's first-party
+global installation. Replace the example script path below with this installed
+skill's directory. This is a version-qualified client of T3's first-party
 RPC, not a documented stable third-party quota API or an MCP wrapper.
 
 ## Read the intended environment
 
 ```sh
 # With T3_WORKERS_TOKEN already supplied privately by its owner:
-node <this-skill-directory>/scripts/t3-limits.mjs \
+node "/absolute/path/to/installed/skills/t3-workers/scripts/t3-limits.mjs" \
   --url http://127.0.0.1:3773 --json
 
 # Or one explicit private token file (raw token or native issuance JSON):
-node <this-skill-directory>/scripts/t3-limits.mjs \
+node "/absolute/path/to/installed/skills/t3-workers/scripts/t3-limits.mjs" \
   --url http://127.0.0.1:3773 --token-file /absolute/private/session.json --json
 ```
 
@@ -43,38 +44,59 @@ same result is rendered as readable account/window lines.
 
 Do not repurpose the chief's MCP OAuth credential: its `mcp-client` audience
 is deliberately rejected by the native client API. `orchestration:read` grants
-environment-wide reads, not quota-only or project-scoped access. If no normal session has
-been supplied, use T3's authenticated UI or obtain authorization for one;
-installing the plugin is not that authorization.
+environment-wide reads, not quota-only or project-scoped access. If no normal
+session has been supplied, use T3's authenticated UI or obtain authorization
+for one; installing the plugin is not that authorization.
 
-For an authorized session, use the installed T3 CLI and the **same data root
-as the intended service**. Capture stdout privately because it contains the
-bearer credential. For example, after selecting a private destination outside
-repositories and configuration snapshots:
+For an authorized batch of reads, issue **one temporary native session**, not
+a permanent token or a new session per invocation. Use the installed T3 CLI
+matching the service and pass its **exact data root** on issue, list and revoke,
+even if it looks like the default. Do not rely on inherited `T3CODE_HOME`.
+
+Before running the examples, set `T3_DATA_ROOT` to that root,
+`T3_LIMITS_LABEL` to a label unique to this batch, and `PRIVATE_SESSION_JSON`
+to a previously unused file in a caller-owned private directory outside
+repositories and configuration snapshots. The directory must be accessible
+only to its owner. Capture stdout privately: it contains the bearer credential.
+
+**Never omit `--scope`: T3 otherwise grants broad administrative defaults.**
+Also pass an explicit unique `--label` and a short `--ttl` appropriate to the
+batch; `5m` below is a native supported example, not an automatic renewal policy.
 
 ```sh
-# Select a unique label and a previously unused private path first.
 (umask 077; set -C; t3 auth session issue \
-  --scope orchestration:read --label "$T3_LIMITS_LABEL" --ttl 1h --json \
+  --base-dir "$T3_DATA_ROOT" \
+  --scope orchestration:read --label "$T3_LIMITS_LABEL" --ttl 5m --json \
   > "$PRIVATE_SESSION_JSON")
 ```
 
-Pass `--base-dir` to the native commands if the service uses a nondefault root.
-**Never omit `--scope`: T3 otherwise grants broad administrative defaults.**
-Record the returned `sessionId` without revealing its token. T3 owns lifecycle:
+Keep the returned `sessionId` as `T3_LIMITS_SESSION_ID` without printing its
+token. Use `--token-file "$PRIVATE_SESSION_JSON"` for the batch's reads and pin
+the intended environment ID. Do not invoke the reader with another credential
+source still set. The file accepts the native issuance JSON directly.
+
+When the batch finishes, wait for **every reader process to exit and close its
+connection before revoking**. Do not treat stdout, a timeout or a session-list
+`connected:false` flag as proof that a reader has exited. Then use T3's native
+lifecycle commands in the same data root:
 
 ```sh
-t3 auth session list --json
-t3 auth session revoke <exact-session-id>
+t3 auth session revoke --base-dir "$T3_DATA_ROOT" "$T3_LIMITS_SESSION_ID"
+t3 auth session list --base-dir "$T3_DATA_ROOT" --json
 ```
 
-For a one-off check, revoke that exact session afterward, verify it no longer
-appears in the active list, then remove the caller-owned private token file.
-If issuance was uncertain, reconcile the uniquely labelled session before
-issuing again. The helper never creates, stores, renews or revokes credentials;
-neither plugin removal nor a finished command revokes a supplied session.
+Verify that the **exact session ID is absent** from the active list, then remove
+the caller-owned private credential file. If issuance, a read or revocation has
+an uncertain outcome, reconcile this same session by its known ID or unique
+batch label before another attempt. Do not blindly issue a replacement. If the
+label matches multiple sessions, resolve their identities rather than choosing
+one. Close any surviving reader before retrying or revoking; do not assume
+revocation alone terminates an already-open socket.
+
+The helper never creates, stores, renews or revokes credentials; neither plugin
+removal nor a finished command revokes a supplied session.
 [Audience boundary](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/internals/environment-auth.md#L26-L62),
-[native session commands](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/cli/auth.ts#L164-L235).
+[native session commands](https://github.com/pingdotgg/t3code/blob/v0.1.1/apps/server/src/cli/auth.ts#L159-L244).
 
 ## Snapshots and explicit refresh
 

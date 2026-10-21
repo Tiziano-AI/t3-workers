@@ -50,25 +50,33 @@ identity reuse remove more user work than they create.
 
 ## A narrow quota seam
 
-T3 0.1.0 exposes provider quota through its first-party client RPC, but not its
-outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only that
-read: environment discovery, a native WebSocket ticket, unary Effect RPC, and
+T3 0.1.0 and 0.1.1 expose provider quota through their first-party client RPC,
+but not outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
+that read: environment discovery, a native WebSocket ticket, unary Effect RPC, and
 whitelisted account/window output. It has no dependencies beyond Node.js
 22.15+, no provider integrations, no cache and no process that stays alive.
 
 This is a source-visible **native client contract**, not a documented stable
-third-party quota API. The command rejects servers other than 0.1.0/protocol 2
-before sending a session token. Qualify new versions deliberately; do not
-silently widen the gate. Prefer a suitable native quota tool if T3 adds one,
-then retire this adapter rather than maintaining two ways to read the same data.
+third-party quota API. The command accepts exactly 0.1.0 and 0.1.1, both on
+protocol 2, and rejects other versions before sending a session token. Qualify
+new versions deliberately; do not silently widen the gate. Prefer a suitable
+native quota tool if T3 adds one, then retire this adapter rather than
+maintaining two ways to read the same data.
 
 The caller supplies a normal environment bearer session with
 `orchestration:read`. MCP OAuth credentials have a different audience and
 cannot be repurposed. T3 owns session issuance/revocation; the plugin never
-mints, stores or renews credentials. Its default read requests no provider
-refresh. Explicit `--refresh` may run native status probes and still retain
-last-good quota values, hiding the latest failure. Report source timestamps,
-not invented freshness. A client timeout does not cancel a server refresh.
+mints, stores or renews credentials. Installation is not authorization to issue
+a session. An authorized temporary session can serve a batch of reads: use the
+exact service data root, an explicit read scope, unique label and short TTL;
+close all readers before revoking that exact session and verifying revocation.
+Reconcile the same session after an uncertain outcome rather than issuing
+another blindly. The quota guide owns the complete native procedure.
+
+The default read requests no provider refresh. Explicit `--refresh` may run
+native status probes and still retain last-good quota values, hiding the latest
+failure. Report source timestamps, not invented freshness. A client timeout
+does not cancel a server refresh.
 
 Coverage is native provider-instance snapshots, not pooled Limits panels or
 external usage hubs. No percentages are summed across accounts or providers.
@@ -87,17 +95,20 @@ Primary packaging sources:
 
 ## Qualification
 
-The current package is **0.1.0-alpha.2**, targeting the released T3 0.1.0
-contract. It moves catalog ownership to the publisher marketplace without
-changing the shared skill or quota command. Schema/source checks, catalog
-fetching, host loading, authentication and successful worker execution are
-different claims. Public availability does not imply all of them passed.
+This is an **alpha** with a released T3 0.1.0 outside-agent baseline and a quota
+reader qualified for 0.1.0 and 0.1.1/protocol 2. Schema/source
+checks, catalog fetching, host loading, authentication and successful worker
+execution are separate qualification steps; public availability does not
+establish them all.
 
-The unchanged quota command passed a real snapshot read on 18 October 2026
-against T3 0.1.0/protocol 2 across Codex, Claude and Grok instances. Its
-explicitly authorized temporary read-only session was revoked and absence
-verified. No refresh, provider inference or live user-home plugin installation
-was part of that check.
+The quota command passed real snapshot reads against T3 0.1.0 on 18 October
+2026 and 0.1.1 on 21 October 2026, both on protocol 2 across Codex, Claude and
+Grok instances. The temporary read-only sessions were revoked after the readers
+exited. These reads requested no refresh or inference and did not establish
+plugin installation or a worker cycle. Synthetic tests cover both admitted
+versions and rejection of unknown versions, incompatible protocols and the
+wrong environment before credential transmission. Source compatibility and
+these live reads do not establish that a chief has loaded this source version.
 
 Use the publisher catalog's native installation path to check delivery of this
 package. Isolated package acceptance establishes that the client can install

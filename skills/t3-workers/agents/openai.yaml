@@ -1,4 +1,7 @@
 interface:
   display_name: "T3 Workers"
-  short_description: "Operate and recover your T3 worker fleet"
+  short_description: "Delegate, follow and recover T3 work"
+  icon_small: "./assets/t3-workers.svg"
+  icon_large: "./assets/t3-workers.png"
+  brand_color: "#2348AA"
   default_prompt: "Use $t3-workers to assign a bounded task to my T3 fleet and bring back its result."
