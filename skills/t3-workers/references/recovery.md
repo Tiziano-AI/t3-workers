@@ -31,10 +31,14 @@ run failed.
 
 ## Reconcile by the uncertain transition
 
+The request-key guarantees below belong to MCP and its authenticated client
+session; they do not apply to the native `t3 thread` CLI.
+
 | What is uncertain | Safe continuation |
 | --- | --- |
 | Launch response was lost | Recover by unique title and project enumeration as above. Launch has no retry key; do not create another thread merely because its response is missing. If discovery cannot settle the outcome, report that uncertainty before another launch. |
-| Send response was lost | Read the target timeline and run state. If retry is needed, use the identical payload and original `clientRequestId` within the same authenticated client session. Do not issue a new key to recover the same assignment. After reauthentication, reconcile without assuming the former deduplication namespace survived. |
+| MCP send response was lost | Read the target timeline and run state. If retry is needed, use the identical payload and original `clientRequestId` within the same authenticated client session. Do not issue a new key to recover the same assignment. After reauthentication, reconcile without assuming the former deduplication namespace survived. |
+| Native CLI start/send response was lost | Recover the thread and read its timeline/run state before another command. `start` may already have created the worker; `send` always queues and offers no caller-supplied retry key. Repeating it can create another turn. |
 | Wait timed out or the chief went away | Read/wait on the existing run. A timeout neither cancels the run nor authorizes resending its brief. Avoid repeatedly reading unchanged full transcripts; retain the relevant cursor. |
 | Run is waiting | Inspect activity and pending questions. A zero question count does not rule out a human security approval. Use the supported human interface for permissions. |
 | Provider failed, account is exhausted, or quota is unknown | Preserve any result and report the precise gap. Do not change account/model, consume a reset, reauthenticate, or launch a replacement without the necessary authority. Distinguish observed failure from stale or unavailable capacity information. |

@@ -35,11 +35,13 @@ These references travel with the skill; they are not separate integrations.
    plugin-managed connection can have different prefixes. If several T3
    connections exist, resolve the intended environment before an effect;
    distinguish their configured endpoints and relevant project inventories.
-2. Call `orchestrator_capabilities`. Inspect provider instances, models,
-   supported options, constraints, and permission ceiling. Catalog presence
-   establishes selection eligibility, not working authentication, successful
-   inference, or available quota. A missing host tool is not proof that the
-   server lacks that operation. Do not repair configuration, log in, or grant
+2. Call `orchestrator_capabilities`. Inspect provider instances, the model
+   shortlist, supported options, constraints, and permission ceiling. If the
+   intended model is absent, use `search` before declaring it unavailable.
+   Check `omittedModels` rather than treating the shortlist as a complete
+   catalog. Catalog presence establishes selection eligibility, not working
+   authentication, successful inference, or available quota. A missing host tool
+   is not proof that the server lacks that operation. Do not repair configuration, log in, or grant
    access as an unrequested preflight.
 3. Act as an **outside chief**, not an internal T3 parent. With
    `parentThreadId: null`, launch ordinary top-level workers using
@@ -47,14 +49,16 @@ These references travel with the skill; they are not separate integrations.
    completion delivery. Supply target IDs explicitly instead of relying on
    calling-thread inheritance.
 4. Resolve the intended provider **instance/account**, model, and requested
-   effort or service tier from the current catalog. Distinguish the provider
+   effort or service tier from current discovery. Distinguish the provider
    driver from a configured account instance. A display name is a configured
    label, not independently verified account identity; when that distinction
    matters, use a supported identity read or confirm the mapping with the user.
-   Use only advertised option IDs and values; do not copy knobs between
-   providers. Preserve explicit user selections. A missing model, exhausted
-   account, or unsupported option is a declared gap, not permission to switch
-   silently or change global defaults.
+   Use stable IDs, not optional display labels. Read each option's advertised
+   `values` and optional default, then pass selected options as `{id, value}`;
+   do not copy the descriptive schema or knobs between providers. Preserve
+   explicit user selections. A missing model, exhausted account, or unsupported
+   option is a declared gap, not permission to switch silently or change global
+   defaults.
 
 ### Capacity before dispatch
 
@@ -65,7 +69,7 @@ across providers are not equivalent token budgets, and another thread does not
 create more account capacity.
 
 Use a suitable native structured capacity tool if the connected release
-exposes one. Released T3 **v0.1.0 and v0.1.1** do not expose this through
+exposes one. Released T3 **through v0.1.2** does not expose this through
 outside-agent MCP. This package's optional reader uses the native client RPC instead:
 
 ```sh
@@ -77,8 +81,8 @@ Replace the example path with this installed skill's directory. Read
 22.15+ and an explicitly supplied normal T3 read-only session, **not** the MCP
 OAuth credential. Do not issue a session as an unrequested preflight. Default
 to published snapshots; `--refresh` explicitly requests native status probes.
-The reader accepts exactly 0.1.0 and 0.1.1/protocol 2 and covers native provider
-instances, not pooled external usage sources. Use the authenticated
+The reader accepts exactly 0.1.0, 0.1.1, and 0.1.2/protocol 2 and covers native
+provider instances, not pooled external usage sources. Use the authenticated
 **Usage → Limits** UI when the reader is unavailable. Keep unknown capacity
 unknown; do not treat it as zero or unlimited, or block an authorized bounded
 task solely because quota is unavailable. Explain consequential uncertainty
@@ -100,7 +104,12 @@ revert others' work. Split independent contributions only when each can change
 the result; retain integration and consequential choices in this chief.
 
 Resolve a registered project with `t3_project_list`/`t3_project_read`, including
-pagination when needed. For projectless analysis use native `scratch: true`,
+pagination when needed. For settings the commission leaves open, you may
+deliberately use a registered project's defaults; null inherited
+settings on an outside chief are not those defaults. `t3_project_read` shows
+saved defaults, not the launch's effective configuration. Preserve any explicit
+account, model, option, or mode selection and verify the prepared worker either
+way. For projectless analysis use native `scratch: true`,
 which creates a fresh folder outside any repository. For code changes choose
 the exact project and checkout/worktree deliberately. Omitted
 `workspaceStrategy` means the **project root**, not this chief's checkout.
@@ -118,15 +127,18 @@ runtime mode within both the grant and the commission's actual authority.
 ## Launch idle, verify, then send
 
 1. Create a uniquely titled worker with `t3_thread_launch`, **omitting the
-   initial message and attachments**. Pass the explicit selection, workspace,
-   and modes. Keep its `threadId` and preparation state. Launch has no retry
+   initial message and attachments**. Pass commissioned selections and modes,
+   and the deliberate workspace binding; omit settings only when intentionally
+   using the registered project's defaults within the caller's ceiling. Keep
+   its `threadId` and preparation state. Launch has no retry
    key: an uncertain response requires reconciliation, never a blind relaunch.
 2. Read the prepared thread with `t3_thread_read` and
    `t3_thread_configuration`. Confirm the provider instance, effective model
    and options, runtime/interaction modes, project, and workspace binding.
    Wait for preparation where necessary. If they do not match the commission,
    do not send work; resolve the mismatch through an authorized supported
-   operation or report it. Do not silently accept a default.
+   operation or report it. Do not accept a default that overrides an explicit
+   selection.
 3. Send the bounded brief with `t3_thread_send` and a stable
    `clientRequestId` for this logical dispatch. Keep the returned message/run
    IDs. Reuse that key only for an identical retry, not a new instruction.
@@ -179,9 +191,11 @@ a separately supported and authorized wake-up mechanism has been established.
 The launch/recovery method above is grounded in T3's
 [released v0.1.0 outside-agent contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/outside-agents.md)
 and [usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/usage.md).
-The reader's additional quota support uses the released
-[v0.1.1 native usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.1/packages/contracts/src/providerUsageLimits.ts);
-see its reference for the separate session and freshness boundaries.
+The released [v0.1.2 capability contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/orchestratorMcp.ts#L526-L561)
+and [project-default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169)
+qualify discovery and deliberate inheritance above. The reader's quota support
+uses the released [v0.1.2 native usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts);
+see its reference for version qualification, separate sessions, and freshness.
 Use current callable schemas for syntax and newly supported capabilities;
 neither this skill nor a pinned catalog proves what this host can invoke.
 Use [Connect the chief](references/setup.md) for installation and OAuth, not

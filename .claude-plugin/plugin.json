@@ -1,6 +1,6 @@
 {
   "name": "t3-workers",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "description": "Delegate tasks to visible T3 workers from Codex or Claude Code.",
   "author": {
     "name": "Tiziano AI",

@@ -15,9 +15,10 @@ provides one shared skill, connection guidance and an optional quota reader;
 it does not run another server or automatically route work between accounts.
 
 **Alpha.** You need your own T3 environment and a native Codex or Claude Code
-client with plugin support. The operating method uses the released **T3 0.1.0**
-outside-agent contract; the optional quota reader accepts exactly **0.1.0 and
-0.1.1 / protocol 2**. Host, provider and recovery paths are not all
+client with plugin support. The operating method uses released outside-agent
+MCP, introduced in **T3 0.1.0**, with discovery and project-default guidance
+for **0.1.2**. The optional quota reader accepts exactly **0.1.0, 0.1.1, and
+0.1.2 / protocol 2**. Host, provider and recovery paths are not all
 live-qualified. See
 [architecture and qualification](docs/architecture.md#qualification).
 
@@ -85,8 +86,8 @@ route, not copied worker tokens or `Authorization` headers.
 
 The installed [setup guide](skills/t3-workers/references/setup.md) covers
 installation ownership, device pairing versus OAuth, headless service use,
-host-specific discovery and connection recovery. No connection is propagated
-to workers automatically.
+the narrower native CLI scripting route, host-specific discovery and connection
+recovery. No connection is propagated to workers automatically.
 
 ## First use
 
@@ -114,10 +115,10 @@ selections are preserved.
 
 ### Limits worth knowing
 
-- **Quota reads are optional and separate from MCP through T3 0.1.1.** The
+- **Quota reads are optional and separate from MCP through T3 0.1.2.** The
   bundled [quota reader](skills/t3-workers/references/limits.md) uses T3's native client
   RPC with a separately authorized read-only session. It requires Node.js
-  22.15+ and is qualified for exactly **T3 0.1.0 and 0.1.1 / protocol 2**. It
+  22.15+ and accepts exactly **T3 0.1.0, 0.1.1, and 0.1.2 / protocol 2**. It
   reports native account/window snapshots, not an automatic quota router;
   old values can survive a failed refresh. T3's authenticated **Usage → Limits** remains the
   fallback when no reader credential is available. Installing the plugin does

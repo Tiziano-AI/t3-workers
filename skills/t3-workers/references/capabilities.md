@@ -2,10 +2,11 @@
 
 Read this when deciding whether T3 fits an assignment, interpreting quota, or
 explaining what remote access and returned results actually provide. The
-outside-agent baseline below is **released T3 v0.1.0**; quota support has also
-been checked through **released v0.1.1**. This does not assert that other later
-contracts are identical. Use the connected tool schemas for current syntax
-and exposure.
+outside-agent baseline below is **released T3 v0.1.0**, with discovery and
+project-default changes checked in **released v0.1.2**. Quota contract support
+is source-checked through v0.1.2; source support and a live read are separate
+claims. This does not assert that later contracts are identical. Use the
+connected tool schemas for current syntax and exposure.
 
 ## What each side owns
 
@@ -22,17 +23,22 @@ to a worker do not automatically become capabilities of the outside chief.
 
 ## Accounts, models and capacity
 
-`orchestrator_capabilities` describes eligible instances, models, options and
-constraints. A configured account label is not verified authenticated identity;
-catalog presence is not provider health or spare quota. Use the selected
-instance's advertised option IDs; an effort or tier supported by one driver
-need not exist on another.
+`orchestrator_capabilities` describes eligible instances, a model shortlist,
+options and constraints. In v0.1.2 it supports `search` and reports
+`omittedModels`: an absent model is not necessarily unavailable. Search for the
+intended model before declaring a gap. Use stable instance/model IDs, not
+optional display labels. Options describe `{id, values, default?}`; selected
+options are `{id, value}`. An effort or tier supported by one driver need not
+exist on another. [Discovery contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/orchestratorMcp.ts#L526-L561)
 
-**Outside-agent MCP through released v0.1.1 has no quota/usage read.** The bundled
+A configured account label is not verified authenticated identity, and catalog
+presence is not provider health or spare quota.
+
+**Outside-agent MCP through released v0.1.2 has no quota/usage read.** The bundled
 [quota reader](limits.md) reads T3's native provider snapshots through its
-client RPC with a separately authorized environment session. It is qualified
-for exactly 0.1.0 and 0.1.1/protocol 2, not a promised stable third-party API. The
-authenticated **Usage → Limits** UI remains the fallback and can also include
+client RPC with a separately authorized environment session. It accepts exactly
+0.1.0, 0.1.1, and 0.1.2/protocol 2; this is not a promised stable third-party API.
+The authenticated **Usage → Limits** UI remains the fallback and can also include
 pooled/external usage sources outside the reader's coverage. Available windows
 depend on the provider/auth path:
 
@@ -49,9 +55,10 @@ does not override an exhausted weekly window. Do not add percentages across
 providers or treat them as comparable token budgets. Unknown allowance is
 neither zero nor unlimited. See the
 [released usage guide](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/usage.md#L79-L122).
-The reader's additional 0.1.1 qualification uses the
-[released native quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.1/packages/contracts/src/providerUsageLimits.ts)
-and does not expand its scope to pooled sources or imply fresh provider probes.
+The reader's additional 0.1.2 support uses the
+[released native quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts)
+and does not expand its scope to pooled sources, imply fresh provider probes,
+or by itself establish live qualification.
 
 There is no automatic capacity router or reset mechanism in this package.
 Capacity can inform an authorized choice; it does not authorize silently
@@ -64,6 +71,16 @@ attachments, creates a fresh nonrepository folder. Do not combine it with
 `projectId` or `workspaceStrategy`. For code, bind the actual registered project
 and deliberate root/worktree strategy; project root is not the chief's working
 directory. [Launch contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/mcp/toolkits/project/tools.ts#L104-L140)
+
+In v0.1.2 an outside launch can inherit a registered project's resolved model
+and permission defaults, constrained by the caller's ceiling. Use that
+inheritance deliberately when the commission leaves the settings open; it
+must not replace an explicit account/model/option/mode selection. Null inherited
+settings on an outside chief do not describe project defaults. A project read
+shows saved defaults, not the effective launch result: prepare the worker idle,
+then verify its configuration and workspace before sending work. This does not
+establish the same inheritance for Scratch.
+[Default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169)
 
 Launch has **no idempotency key**. Send and interruption do, but their namespace
 is tied to the authenticated client session; reauthentication can change it.

@@ -39,6 +39,26 @@ provider, connected-server and desktop updates; do not assume it changes only
 the visible client. Updating a standalone launcher does not prove an existing
 server process has restarted on that version.
 
+### Local scripting is a narrower route
+
+Released v0.1.2 provides native `t3 thread start/send/show/list` for scripts on the
+server's host. Inspect the selected executable and T3 home before using it;
+an update or new grant is not an automatic preflight. Keep MCP as the chief's
+operating surface: the CLI does not expose idle-first launch, model options
+such as effort/tier, caller-supplied retry keys, interruption, or question
+responses. Its `send` always queues. After an uncertain dispatch, reconcile the
+existing thread/timeline rather than repeating the command blindly.
+[Native scripting guide](https://github.com/pingdotgg/t3code/blob/v0.1.2/docs/user/outside-agents.md#scripts-on-the-host)
+
+These thread commands create a **host-owner/full-access session**, distinct
+from MCP OAuth and the quota reader's temporary read-only session. They normally
+attempt revocation on exit, but cleanup is not guaranteed; the underlying TTL
+is 30 days. Even `show`/`list` are not credential-free reads, and process exit
+does not prove revocation. Do not use this route as the quota reader's session
+recipe or add a wrapper to imitate the missing MCP controls.
+[CLI lifecycle](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/cli/thread.ts),
+[session lifetime](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/auth/EnvironmentAuth.ts#L72-L86)
+
 ## Register through the native chief
 
 Choose the intended native installation and configuration scope. A desktop's

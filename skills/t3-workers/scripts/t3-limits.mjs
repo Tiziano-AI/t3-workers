@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// A read-only client for the qualified T3 0.1.0 and 0.1.1 native client protocol.
+// A read-only client for the qualified T3 0.1.0, 0.1.1 and 0.1.2 native client protocol.
 import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -12,8 +12,8 @@ export class LimitsError extends Error {
   }
 }
 
-const qualifiedServerVersions = new Set(['0.1.0', '0.1.1']);
-const incompatible = () => new LimitsError('INCOMPATIBLE_RESPONSE', 'The server response does not match the qualified T3 0.1.0/0.1.1 client protocol.');
+const qualifiedServerVersions = new Set(['0.1.0', '0.1.1', '0.1.2']);
+const incompatible = () => new LimitsError('INCOMPATIBLE_RESPONSE', 'The server response does not match the qualified T3 0.1.0/0.1.1/0.1.2 client protocol.');
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const string = value => typeof value === 'string' && value.length > 0;
 const iso = value => string(value) && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value));
@@ -116,7 +116,7 @@ function normalizeProvider(provider, token) {
 
 function environmentIdentity(value) {
   if (!object(value) || !string(value.environmentId) || !qualifiedServerVersions.has(value.serverVersion) || value.orchestrationProtocolVersion !== 2) {
-    throw new LimitsError('UNQUALIFIED_SERVER', 'This reader is qualified only for T3 0.1.0 and 0.1.1, orchestration protocol 2.');
+    throw new LimitsError('UNQUALIFIED_SERVER', 'This reader is qualified only for T3 0.1.0, 0.1.1 and 0.1.2, orchestration protocol 2.');
   }
   const identity = { environmentId: value.environmentId, serverVersion: value.serverVersion, orchestrationProtocolVersion: 2 };
   optional(identity, 'label', value.label);
@@ -277,7 +277,7 @@ export function formatText(result) {
 const HELP = `Usage: node t3-limits.mjs [--url ORIGIN] [--environment-id ID] [--instance ID] [--refresh] [--json]
                           [--token-stdin | --token-file PATH] [--timeout-ms N]
 
-Read the native provider-limit snapshot from T3 0.1.0 or 0.1.1/protocol 2. Requires Node >=22.15.
+Read the native provider-limit snapshot from T3 0.1.0, 0.1.1 or 0.1.2/protocol 2. Requires Node >=22.15.
 Auth: exactly one of T3_WORKERS_TOKEN, --token-stdin, or --token-file (raw token/native issue JSON).
 URL: --url, then T3_WORKERS_URL, then http://127.0.0.1:3773.
 Environment pin: --environment-id or T3_WORKERS_ENVIRONMENT_ID. No token is sent before discovery.

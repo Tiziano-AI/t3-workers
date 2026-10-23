@@ -2,11 +2,19 @@
 
 Use `scripts/t3-limits.mjs` relative to this skill's directory when the chief
 needs structured native-provider allowance. It requires **Node.js 22.15+**,
-T3 **0.1.0 or 0.1.1 / orchestration protocol 2**, and a caller-supplied environment
-bearer session with `orchestration:read`. There are no npm dependencies or
-global installation. Replace the example script path below with this installed
-skill's directory. This is a version-qualified client of T3's first-party
+T3 **0.1.0, 0.1.1, or 0.1.2 / orchestration protocol 2**, and a caller-supplied
+environment bearer session with `orchestration:read`. There are no npm
+dependencies or global installation. Replace the example script path below
+with this installed skill's directory. This is a version-qualified client of T3's first-party
 RPC, not a documented stable third-party quota API or an MCP wrapper.
+
+The v0.1.2 contract is source-compatible with the earlier admitted releases.
+A real v0.1.2 snapshot read passed on 23 October 2026 without refresh or
+inference; the temporary read-only session was revoked after the reader exited,
+and the same token was then rejected. This qualifies transport and parsing,
+not fresh provider observations or available allowance.
+[Released quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts),
+[provider snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/server.ts#L217-L281).
 
 ## Read the intended environment
 

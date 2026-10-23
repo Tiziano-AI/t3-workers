@@ -18,6 +18,20 @@ result retrieval and recovery. The native chief owns conversation and judgment.
 T3 owns execution, authentication and durable worker state. No plugin process
 must stay alive, and there is no new gateway, state registry or scheduler.
 
+Discovery stays native. Released v0.1.2 returns a model shortlist with search,
+not a complete catalog to mirror locally. When no selection was commissioned,
+T3 can resolve a registered project's defaults within the caller's ceiling;
+the chief still preserves explicit selections and checks the idle worker's
+effective configuration before dispatch. Saved project settings alone are not
+that readback. [Discovery](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/orchestratorMcp.ts#L526-L561),
+[default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169).
+
+The native v0.1.2 thread CLI serves local scripts, but lacks controls needed by
+this cycle, including idle-first launch, model options and caller-supplied
+retry keys. MCP remains the chief surface; the setup reference explains the
+CLI's distinct host-owner session and narrower recovery guarantees. No dispatch
+wrapper or second authentication store is needed.
+
 ## Packaging and connectivity
 
 Codex consumes the portable root `plugin.json`; Claude Code uses the thin
@@ -50,14 +64,14 @@ identity reuse remove more user work than they create.
 
 ## A narrow quota seam
 
-T3 0.1.0 and 0.1.1 expose provider quota through their first-party client RPC,
-but not outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
+T3 0.1.0, 0.1.1, and 0.1.2 expose provider quota through their first-party client
+RPC, but not outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
 that read: environment discovery, a native WebSocket ticket, unary Effect RPC, and
 whitelisted account/window output. It has no dependencies beyond Node.js
 22.15+, no provider integrations, no cache and no process that stays alive.
 
 This is a source-visible **native client contract**, not a documented stable
-third-party quota API. The command accepts exactly 0.1.0 and 0.1.1, both on
+third-party quota API. The command accepts exactly 0.1.0, 0.1.1, and 0.1.2, all on
 protocol 2, and rejects other versions before sending a session token. Qualify
 new versions deliberately; do not silently widen the gate. Prefer a suitable
 native quota tool if T3 adds one, then retire this adapter rather than
@@ -95,20 +109,32 @@ Primary packaging sources:
 
 ## Qualification
 
-This is an **alpha** with a released T3 0.1.0 outside-agent baseline and a quota
-reader qualified for 0.1.0 and 0.1.1/protocol 2. Schema/source
+This is an **alpha** with a released T3 0.1.0 outside-agent baseline,
+discovery/project-default guidance for v0.1.2, and a quota reader admitting
+exactly 0.1.0, 0.1.1, and 0.1.2/protocol 2. Schema/source
 checks, catalog fetching, host loading, authentication and successful worker
 execution are separate qualification steps; public availability does not
 establish them all.
 
 The quota command passed real snapshot reads against T3 0.1.0 on 18 October
-2026 and 0.1.1 on 21 October 2026, both on protocol 2 across Codex, Claude and
-Grok instances. The temporary read-only sessions were revoked after the readers
-exited. These reads requested no refresh or inference and did not establish
-plugin installation or a worker cycle. Synthetic tests cover both admitted
-versions and rejection of unknown versions, incompatible protocols and the
-wrong environment before credential transmission. Source compatibility and
-these live reads do not establish that a chief has loaded this source version.
+2026, 0.1.1 on 21 October 2026, and 0.1.2 on 23 October 2026, all on protocol 2
+across Codex, Claude and Grok instances. The temporary read-only sessions were
+revoked after the readers exited; the v0.1.2 check also confirmed that the
+revoked token was rejected and removed its private temporary material. These
+reads requested no refresh or inference. They qualify transport and parsing,
+not fresh provider observations, available allowance, plugin installation or a
+worker cycle. The v0.1.2 quota/snapshot and auth/ticket contracts are
+source-compatible.
+Synthetic tests cover all three admitted versions and rejection of unknown
+versions, incompatible protocols and the wrong environment before credential
+transmission. Source compatibility and these live reads do not establish that
+a chief has loaded this source version.
+
+An independent read-only v0.1.2 acceptance check exercised live discovery,
+model search and recovery of an existing worker's configuration and state.
+Explicit-selection and deliberate project-default launch inputs were prepared
+but not submitted; neither a new worker cycle nor resolved default inheritance
+was demonstrated by that check.
 
 Use the publisher catalog's native installation path to check delivery of this
 package. Isolated package acceptance establishes that the client can install

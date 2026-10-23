@@ -87,7 +87,7 @@ test('invalid percentages, protocol drift, and missing selected instance are mea
   assert.throws(() => normalizeConfig(config(), { instanceId: 'missing' }), { code: 'INSTANCE_NOT_FOUND' });
 });
 
-for (const serverVersion of ['0.1.0', '0.1.1']) test(`T3 ${serverVersion} snapshot discovers unauthenticated identity before ticket and uses native Effect requests`, async () => {
+for (const serverVersion of ['0.1.0', '0.1.1', '0.1.2']) test(`T3 ${serverVersion} snapshot discovers unauthenticated identity before ticket and uses native Effect requests`, async () => {
   const h = harness({ discovery: { ...descriptor, serverVersion }, getConfig: () => config(serverVersion) });
   const result = await readLimits({ ...h.options, environmentId: descriptor.environmentId });
   assert.equal(result.schemaVersion, 1);
@@ -153,8 +153,9 @@ test('omitting an instance deliberately permits an all-provider refresh', async 
 
 test('unqualified or wrong environment descriptor prevents bearer transmission', async () => {
   for (const discovery of [
-    ...['0.1.2', '0.2.0', '0.1.1-nightly.1', undefined].map(serverVersion => ({ ...descriptor, serverVersion })),
+    ...['0.1.3', '0.2.0', '0.1.1-nightly.1', undefined].map(serverVersion => ({ ...descriptor, serverVersion })),
     ...[1, 3, undefined].map(orchestrationProtocolVersion => ({ ...descriptor, orchestrationProtocolVersion })),
+    { ...descriptor, serverVersion: '0.1.2', orchestrationProtocolVersion: 3 },
   ]) {
     const h = harness({ discovery });
     await assert.rejects(readLimits(h.options), { code: 'UNQUALIFIED_SERVER' });
@@ -177,8 +178,8 @@ test('getConfig must agree with pre-auth discovery', async () => {
 
 test('getConfig independently rejects unqualified versions or protocols before refresh', async () => {
   for (const environment of [
-    { ...descriptor, serverVersion: '0.1.2' },
-    { ...descriptor, serverVersion: '0.1.1', orchestrationProtocolVersion: 3 },
+    { ...descriptor, serverVersion: '0.1.3' },
+    { ...descriptor, serverVersion: '0.1.2', orchestrationProtocolVersion: 3 },
   ]) {
     const h = harness({ getConfig: () => ({ ...config(), environment }) });
     await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'UNQUALIFIED_SERVER' });
