@@ -333,3 +333,138 @@ test('CLI reads explicit stdin or native issue file, applies environment setting
     assert.ok(!stdout.text.includes(TOKEN));
   }
 });
+
+test('admission compares the exact version string and protocol number at both gates', async () => {
+  for (const environment of [
+    ...[' 0.1.5', '0.1.5 ', '0.1.5\n', 'v0.1.5', '0.1.50', '0.1.5+build.1'].map(serverVersion => ({ ...descriptor, serverVersion })),
+    { ...descriptor, serverVersion: '0.1.5', orchestrationProtocolVersion: '2' },
+  ]) {
+    const early = harness({ discovery: environment });
+    await assert.rejects(readLimits(early.options), { code: 'UNQUALIFIED_SERVER' });
+    assert.equal(early.http.length, 1);
+    const late = harness({ discovery: { ...descriptor, serverVersion: '0.1.5' }, getConfig: () => ({ ...config('0.1.5'), environment }) });
+    await assert.rejects(readLimits(late.options), { code: 'UNQUALIFIED_SERVER' });
+    assert.equal(late.sockets[0].closed, true);
+  }
+});
+
+test('every native window kind and zero boundary keeps its identity, order and absent fields', () => {
+  const native = config();
+  native.providers[0].usageLimits = {
+    checkedAt: stamp,
+    windows: [
+      { id: 'five_hour', kind: 'session', label: '5 hours', usedPercent: 0, resetsAt: stamp, windowDurationMins: 300 },
+      { id: 'seven_day', kind: 'weekly', label: 'Weekly', usedPercent: 33.25, windowDurationMins: 0 },
+      { id: 'monthly', kind: 'monthly', label: 'Monthly', usedPercent: 100 },
+      { id: 'overage', kind: 'other', label: 'Overage', usedPercent: 12.5 },
+    ],
+    resetCredits: { availableCount: 0 },
+  };
+  assert.deepEqual(normalizeConfig(native).accounts[0].usageLimits, {
+    checkedAt: stamp,
+    windows: [
+      { id: 'five_hour', kind: 'session', label: '5 hours', usedPercent: 0, remainingPercent: 100, resetsAt: stamp, windowDurationMins: 300 },
+      { id: 'seven_day', kind: 'weekly', label: 'Weekly', usedPercent: 33.25, remainingPercent: 66.75, windowDurationMins: 0 },
+      { id: 'monthly', kind: 'monthly', label: 'Monthly', usedPercent: 100, remainingPercent: 0 },
+      { id: 'overage', kind: 'other', label: 'Overage', usedPercent: 12.5, remainingPercent: 87.5 },
+    ],
+    resetCredits: { availableCount: 0 },
+  });
+});
+
+test('native degraded accounts are data, not a failed read for every other account', () => {
+  const degraded = overrides => ({ ...provider(), usageLimits: undefined, ...overrides });
+  const native = config();
+  native.providers = [
+    degraded({ instanceId: 'warning', status: 'warning', auth: { status: 'unknown' } }),
+    degraded({ instanceId: 'disabled', status: 'disabled', enabled: false, auth: { status: 'unauthenticated' } }),
+    degraded({ instanceId: 'absent', status: 'error', enabled: false, installed: false, version: null, availability: 'unavailable', unavailableReason: 'Not installed', auth: { status: 'unknown' } }),
+  ];
+  assert.deepEqual(normalizeConfig(native).accounts.map(a => [a.instanceId, a.status, a.auth.status, a.version, a.availability, a.usageLimits]), [
+    ['warning', 'warning', 'unknown', '1.0', 'available', null],
+    ['disabled', 'disabled', 'unauthenticated', '1.0', 'available', null],
+    ['absent', 'error', 'unknown', null, 'unavailable', null],
+  ]);
+});
+
+test('last-good limits keep their own time and a messageless failure stays visible after refresh', async () => {
+  // Keep last-good snapshots, sparse limits and empty failure results distinct.
+  const providerTime = '2026-10-18T13:00:00.000Z', readTime = '2026-10-18T14:00:00.000Z';
+  const account = (instanceId, usageLimits) => ({ ...provider(), instanceId, checkedAt: providerTime, ...usageLimits });
+  const h = harness({ getConfig: () => ({ ...config(), providers: [
+    account('last-good'),
+    account('sparse', { usageLimits: { checkedAt: providerTime, windows: [{ id: 'session', kind: 'session', label: 'Session', usedPercent: 40 }], unavailable: { reason: 'probeFailed' } } }),
+    account('failed', { usageLimits: { checkedAt: providerTime, windows: [], unavailable: { reason: 'probeFailed' } } }),
+  ] }) });
+  const result = await readLimits({ ...h.options, refresh: true, now: () => new Date(readTime) });
+  assert.equal(result.readAt, readTime);
+  assert.equal(result.refreshRequested, true);
+  const [lastGood, sparse, failed] = result.accounts;
+  assert.equal(lastGood.checkedAt, providerTime);
+  assert.equal(lastGood.usageLimits.checkedAt, stamp);
+  assert.equal(lastGood.usageLimits.windows[0].remainingPercent, 87.5);
+  assert.equal(lastGood.usageLimits.unavailable, undefined);
+  assert.deepEqual(sparse.usageLimits.unavailable, { reason: 'probeFailed' });
+  assert.equal(sparse.usageLimits.windows[0].remainingPercent, 60);
+  assert.deepEqual(failed.usageLimits, { checkedAt: providerTime, windows: [], unavailable: { reason: 'probeFailed' } });
+  const [, lastGoodText, sparseText, failedText] = formatText(result).split('\n\n');
+  assert.ok(lastGoodText.includes(`Provider checked: ${providerTime}; limits checked: ${stamp}`));
+  assert.ok(!lastGoodText.includes('probeFailed'));
+  assert.ok(sparseText.includes('60% remaining') && sparseText.includes('probeFailed') && !sparseText.includes('Capacity: unknown'));
+  assert.ok(failedText.includes('Capacity: unknown') && failedText.includes('probeFailed'));
+});
+
+test('refresh reports the post-refresh read, not the first read or the refresh reply', async () => {
+  const used = usedPercent => ({ ...config(), providers: [{ ...provider(), usageLimits: { checkedAt: stamp, windows: [{ id: 'session', kind: 'session', label: 'Session', usedPercent }] } }] });
+  let reads = 0;
+  const h = harness({ reply(socket, request) {
+    const value = request.tag === 'server.refreshProviders' ? { providers: used(90).providers } : used(reads++ === 0 ? 10 : 30);
+    socket.emit({ _tag: 'Exit', requestId: request.id, exit: { _tag: 'Success', value } });
+  } });
+  assert.equal((await readLimits({ ...h.options, refresh: true })).accounts[0].usageLimits.windows[0].usedPercent, 30);
+});
+
+test('a refresh-phase failure closes the socket and returns no earlier snapshot', async () => {
+  const success = (request, value) => ({ _tag: 'Exit', requestId: request.id, exit: { _tag: 'Success', value } });
+  const secondRead = value => request => success(request, request.tag === 'server.refreshProviders' ? { providers: [] } : value);
+  for (const [code, afterFirstRead, instanceId] of [
+    ['REMOTE_FAILURE', request => ({ _tag: 'Exit', requestId: request.id, exit: { _tag: 'Failure', cause: [{ _tag: 'Fail', error: { message: TOKEN } }] } })],
+    ['INCOMPATIBLE_RESPONSE', request => success(request, request.tag === 'server.refreshProviders' ? { providers: 'unexpected' } : config())],
+    ['UNQUALIFIED_SERVER', secondRead(config('0.1.4'))],
+    ['ENVIRONMENT_MISMATCH', secondRead(config('0.1.2'))],
+    ['INSTANCE_NOT_FOUND', secondRead({ ...config(), providers: [] }), 'codex-one'],
+  ]) {
+    let reads = 0;
+    const h = harness({ reply(socket, request) { socket.emit(reads++ === 0 ? success(request, config()) : afterFirstRead(request)); } });
+    await assert.rejects(readLimits({ ...h.options, instanceId, refresh: true }), error => error.code === code && !error.message.includes(TOKEN));
+    assert.equal(h.sockets.length, 1);
+    assert.equal(h.sockets[0].closed, true);
+  }
+});
+
+test('provider-controlled text is redacted in both outputs and the native hub link never passes through', () => {
+  const native = config(), account = native.providers[0];
+  Object.assign(account, { displayName: 'Test\u001b[2J account', message: `Failed for ${TOKEN}`, unavailableReason: 'Bearer other-bearer-value rejected' });
+  account.usageLimits.windows[0].label = `Session ${TOKEN}`;
+  account.usageLimits.externalUsage = { label: 'private-hub-label', url: 'https://private-hub.example.invalid/' };
+  const result = normalizeConfig(native, { token: TOKEN, readAt: stamp });
+  for (const rendered of [JSON.stringify(result), formatText(result)]) {
+    for (const hidden of [TOKEN, 'other-bearer-value', 'private-hub', 'externalUsage', '\u001b']) assert.ok(!rendered.includes(hidden));
+  }
+});
+
+test('a malformed ticket response opens no socket', async () => {
+  for (const ticket of [null, [], {}, { ticket: '', expiresAt: stamp }, { ticket: 'x' }, { ticket: 'x', expiresAt: 'soon' }]) {
+    const h = harness();
+    const fetchImpl = async (url, options) => url.endsWith('/.well-known/t3/environment')
+      ? h.options.fetchImpl(url, options) : { ok: true, status: 200, json: async () => ticket };
+    await assert.rejects(readLimits({ ...h.options, fetchImpl }), { code: 'INCOMPATIBLE_RESPONSE' });
+    assert.equal(h.sockets.length, 0);
+  }
+});
+
+test('a server close before the reply is a closed connection, not a deadline', async () => {
+  const h = harness({ reply(socket) { socket.readyState = 3; socket.dispatchEvent(new Event('close')); } });
+  await assert.rejects(readLimits(h.options), { code: 'CONNECTION_CLOSED', exitCode: 3 });
+  assert.equal(h.requests.length, 1);
+});
