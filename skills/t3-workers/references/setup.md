@@ -130,6 +130,7 @@ If tools are missing, distinguish these cases before changing anything:
 | --- | --- |
 | Plugin skill is missing | Check marketplace, installed version and host reload; this is not a T3 service failure. |
 | Skill loads, but T3 tools do not | Inspect the native MCP registration and discovery/enablement in this chief. |
+| Some expected tools are missing after a T3 update | Compare the host allowlist with actual discovery. Checked at v0.1.5, the older configuration reader is folded into `t3_thread_configure` and the three `t3_pending_request_*` tools into `t3_pending_request`. Allowing `configure` exposes both reading and model changes, not just a renamed reader; the host owner must authorize that exposure. Do not remove the allowlist or broaden OAuth or permissions. |
 | Endpoint is unreachable | Check the selected route and existing service status; do not launch a second server. |
 | Authentication or scope is rejected | Inspect the exact connection/grant and native login state; do not substitute accounts. |
 | Client reports a protocol mismatch | Identify the server/client owner and follow T3's update guidance; no blind reinstall or data-root switch. |

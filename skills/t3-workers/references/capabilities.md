@@ -3,9 +3,10 @@
 Read this when deciding whether T3 fits an assignment, interpreting quota, or
 explaining what remote access and returned results actually provide. The
 outside-agent baseline below is **released T3 v0.1.0**, with discovery and
-project-default changes checked in **released v0.1.2**. Quota contract support
-is source-checked through v0.1.2; source support and a live read are separate
-claims. This does not assert that later contracts are identical. Use the
+project-default changes checked in **released v0.1.2** and outside-chief
+exposure/recovery checked in **released v0.1.5**. Quota contract support
+is source-checked for 0.1.0, 0.1.1, 0.1.2, and 0.1.5; source support and a live read are separate
+claims. This does not assert that intervening or later contracts are identical. Use the
 connected tool schemas for current syntax and exposure.
 
 ## What each side owns
@@ -34,10 +35,10 @@ exist on another. [Discovery contract](https://github.com/pingdotgg/t3code/blob/
 A configured account label is not verified authenticated identity, and catalog
 presence is not provider health or spare quota.
 
-**Outside-agent MCP through released v0.1.2 has no quota/usage read.** The bundled
+**Released v0.1.5, like the earlier qualified releases, has no outside-agent MCP quota read.** The bundled
 [quota reader](limits.md) reads T3's native provider snapshots through its
 client RPC with a separately authorized environment session. It accepts exactly
-0.1.0, 0.1.1, and 0.1.2/protocol 2; this is not a promised stable third-party API.
+0.1.0, 0.1.1, 0.1.2, and 0.1.5/protocol 2; this is not a promised stable third-party API.
 The authenticated **Usage → Limits** UI remains the fallback and can also include
 pooled/external usage sources outside the reader's coverage. Available windows
 depend on the provider/auth path:
@@ -82,12 +83,30 @@ then verify its configuration and workspace before sending work. This does not
 establish the same inheritance for Scratch.
 [Default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169)
 
-Launch has **no idempotency key**. Send and interruption do, but their namespace
-is tied to the authenticated client session; reauthentication can change it.
+In released v0.1.5, the configuration reader is folded into
+`t3_thread_configure` rather than the older separate `t3_thread_configuration`.
+Its read form supplies only the `threadId`; setting
+`modelSelection` is a mutation and needs its own authority. The launch receipt
+also returns `modelSelection`, while `t3_thread_read` supplies workspace and run
+state. `t3_pending_request` combines the older list/read/respond operations.
+A host allowlist naming removed tools can hide these replacements even when
+T3 exposes them. Allowlisting `t3_thread_configure` exposes both read and change,
+not an equivalent read-only replacement. The host owner decides that exposure;
+OAuth and the permission ceiling remain separate. The tool is annotated
+destructive, so a host may require approval even for its read form.
+[Read/write branches](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/thread/handlers.ts#L194-L260).
+
+Released v0.1.5 supports optional **launch `clientRequestId`**; supply and retain it
+for a new logical launch. Releases 0.1.0–0.1.2 lack that field. Launch,
+send and interruption retry keys are tied to the authenticated client session;
+reauthentication can change their namespace. Do not replay changed inputs under
+an old key or assume it survives a new grant: a changed launch payload with
+the same key can replay the first worker without a conflict error. Model
+changes and question responses have no retry key; reconcile them before repeating.
 Wait returns state, not the result, and timeout does not cancel work. Read
 messages/activity and complete needed text pagination. Use the [recovery guide](recovery.md)
-before repeating a possibly accepted operation. [Operations contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/mcp/toolkits/orchestrator/tools.ts#L236-L273),
-[OAuth namespace](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/auth/McpOAuth.ts#L572-L580)
+before repeating a possibly accepted operation. [Launch replay](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/project/handlers.ts#L63-L138),
+[OAuth namespace](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/auth/McpOAuth.ts#L564-L575)
 
 A worktree isolates tracked checkout writes, not credentials, services or
 security access. T3 is not a generic filesystem-transfer API. Check source

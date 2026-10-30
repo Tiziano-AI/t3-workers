@@ -2,11 +2,19 @@
 
 Use `scripts/t3-limits.mjs` relative to this skill's directory when the chief
 needs structured native-provider allowance. It requires **Node.js 22.15+**,
-T3 **0.1.0, 0.1.1, or 0.1.2 / orchestration protocol 2**, and a caller-supplied
+T3 **0.1.0, 0.1.1, 0.1.2, or 0.1.5 / orchestration protocol 2**, and a caller-supplied
 environment bearer session with `orchestration:read`. There are no npm
 dependencies or global installation. Replace the example script path below
 with this installed skill's directory. This is a version-qualified client of T3's first-party
 RPC, not a documented stable third-party quota API or an MCP wrapper.
+
+The descriptor gate runs before bearer transmission. `UNQUALIFIED_SERVER`
+means a malformed identity or a version/protocol not admitted by this reader,
+not that T3 or its quota service is broken. The authenticated configuration is
+checked again: a rejection there occurs after token transmission and returns
+no snapshot. A change between admitted descriptor/config versions or identity
+fails with `ENVIRONMENT_MISMATCH` before any refresh. Releases 0.1.3 and 0.1.4
+remain unqualified; do not bypass the gate or assume a numeric range.
 
 The v0.1.2 contract is source-compatible with the earlier admitted releases.
 A real v0.1.2 snapshot read passed on 23 October 2026 without refresh or
@@ -15,6 +23,22 @@ and the same token was then rejected. This qualifies transport and parsing,
 not fresh provider observations or available allowance.
 [Released quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts),
 [provider snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/server.ts#L217-L281).
+
+The v0.1.5 qualification checked the tagged descriptor, audience-specific
+ticket routes, RPC handshake, config/refresh contracts and native snapshot
+fields. It uses `POST /api/auth/websocket-ticket/rpc` for an RPC-only ticket;
+the bare route also permits media and is not needed for this read. Earlier
+admitted releases use their bare ticket route. A real v0.1.5 snapshot read
+passed on 30 October 2026 without refresh or inference; it establishes
+transport/parsing, not fresh upstream observations or spare capacity.
+[Descriptor](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/environment.ts#L159-L169),
+[ticket routes](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/environmentHttp.ts#L557-L571),
+[ticket audiences](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/auth/EnvironmentAuth.ts#L1192-L1272),
+[RPC handshake](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/ws.ts#L3271-L3297),
+[config/refresh](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/rpc.ts#L623-L647),
+[snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/server.ts#L206-L267),
+[quota fields](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/providerUsageLimits.ts#L13-L49),
+[last-good retention](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/provider-core/src/server/usageLimits.ts#L102-L121).
 
 ## Read the intended environment
 
@@ -146,7 +170,11 @@ Provider `ready` is not proof of spare quota. External usage hubs/pooled Limits
 sources are **not** included. Reset counts are reported, never consumed.
 [Native fields](https://github.com/pingdotgg/t3code/blob/v0.1.0/packages/contracts/src/providerUsageLimits.ts#L20-L70).
 
-Errors instead return `schemaVersion: 1` and `error: {code, message}`. Exit codes:
+Errors instead return `schemaVersion: 1` and `error: {code, message}` with
+optional `error.details`. For `UNQUALIFIED_SERVER`, details include a sanitized
+`observedServerVersion` (or `null`), `observedOrchestrationProtocolVersion`,
+`qualifiedServerVersions` and `tokenSent`; inspect the latter to distinguish
+pre-auth admission from the authenticated configuration check. Exit codes:
 `0` successful snapshot, `2` invalid input/auth source or missing instance,
 `3` HTTP/transport failure, `4` unqualified/incompatible protocol or identity,
 `5` native RPC rejection, `6` deadline. Successful reads may contain unknown,

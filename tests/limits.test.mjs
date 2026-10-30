@@ -87,7 +87,7 @@ test('invalid percentages, protocol drift, and missing selected instance are mea
   assert.throws(() => normalizeConfig(config(), { instanceId: 'missing' }), { code: 'INSTANCE_NOT_FOUND' });
 });
 
-for (const serverVersion of ['0.1.0', '0.1.1', '0.1.2']) test(`T3 ${serverVersion} snapshot discovers unauthenticated identity before ticket and uses native Effect requests`, async () => {
+for (const serverVersion of ['0.1.0', '0.1.1', '0.1.2', '0.1.5']) test(`T3 ${serverVersion} snapshot discovers unauthenticated identity before ticket and uses native Effect requests`, async () => {
   const h = harness({ discovery: { ...descriptor, serverVersion }, getConfig: () => config(serverVersion) });
   const result = await readLimits({ ...h.options, environmentId: descriptor.environmentId });
   assert.equal(result.schemaVersion, 1);
@@ -96,6 +96,8 @@ for (const serverVersion of ['0.1.0', '0.1.1', '0.1.2']) test(`T3 ${serverVersio
   assert.equal(h.http[0].options.headers, undefined);
   assert.equal(h.http[1].options.headers.Authorization, `Bearer ${TOKEN}`);
   assert.equal(h.http[1].options.method, 'POST');
+  assert.equal(new URL(h.http[1].url).pathname, serverVersion === '0.1.5'
+    ? '/api/auth/websocket-ticket/rpc' : '/api/auth/websocket-ticket');
   assert.ok(h.http.every(call => call.options.redirect === 'error'));
   assert.deepEqual(h.requests, [{ _tag: 'Request', id: '1', tag: 'server.getConfig', payload: {}, headers: [] }]);
   const wsUrl = new URL(h.sockets[0].url);
@@ -153,7 +155,7 @@ test('omitting an instance deliberately permits an all-provider refresh', async 
 
 test('unqualified or wrong environment descriptor prevents bearer transmission', async () => {
   for (const discovery of [
-    ...['0.1.3', '0.2.0', '0.1.1-nightly.1', undefined].map(serverVersion => ({ ...descriptor, serverVersion })),
+    ...['0.1.3', '0.1.4', '0.1.6', '0.2.0', '0.1.5-nightly.1', undefined].map(serverVersion => ({ ...descriptor, serverVersion })),
     ...[1, 3, undefined].map(orchestrationProtocolVersion => ({ ...descriptor, orchestrationProtocolVersion })),
     { ...descriptor, serverVersion: '0.1.2', orchestrationProtocolVersion: 3 },
   ]) {
@@ -174,6 +176,49 @@ test('getConfig must agree with pre-auth discovery', async () => {
   const h = harness({ getConfig: () => ({ ...config(), environment: { ...descriptor, environmentId: 'changed' } }) });
   await assert.rejects(readLimits(h.options), { code: 'ENVIRONMENT_MISMATCH' });
   assert.equal(h.sockets[0].closed, true);
+});
+
+test('an admitted config version cannot change after discovery, even before refresh', async () => {
+  for (const [initial, later] of [['0.1.2', '0.1.5'], ['0.1.5', '0.1.2']]) {
+    const h = harness({ discovery: { ...descriptor, serverVersion: initial }, getConfig: () => config(later) });
+    await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'ENVIRONMENT_MISMATCH' });
+    assert.deepEqual(h.requests.map(r => r.tag), ['server.getConfig']);
+    assert.equal(h.sockets[0].closed, true);
+  }
+});
+
+test('qualification errors distinguish pre-auth admission from authenticated config without leaking versions', async () => {
+  for (const tokenSent of [false, true]) {
+    for (const serverVersion of ['0.1.6', `0.1.6-${TOKEN}`, `Bearer ${TOKEN}`, '0.1.6?wsTicket=private-ticket']) {
+      for (const json of [false, true]) {
+        const bad = { ...descriptor, serverVersion };
+        const h = harness(tokenSent
+          ? { getConfig: () => ({ ...config(), environment: bad }) }
+          : { discovery: bad });
+        let output = '';
+        const sink = { write: value => { output += value; } };
+        const code = await main(json ? ['--json'] : [], {
+          env: { T3_WORKERS_TOKEN: TOKEN }, stdout: sink, stderr: sink,
+          readLimitsImpl: options => readLimits({ ...h.options, ...options }),
+        });
+        assert.equal(code, 4);
+        assert.ok(!output.includes(TOKEN));
+        assert.ok(!output.includes('private-ticket'));
+        if (json) {
+          const error = JSON.parse(output).error;
+          assert.equal(error.code, 'UNQUALIFIED_SERVER');
+          assert.equal(error.details.tokenSent, tokenSent);
+          assert.equal(error.details.observedServerVersion, serverVersion === '0.1.6' ? '0.1.6' : null);
+          assert.deepEqual(error.details.qualifiedServerVersions, ['0.1.0', '0.1.1', '0.1.2', '0.1.5']);
+        } else {
+          assert.match(output, tokenSent ? /authenticated configuration/ : /no session token was sent/);
+        }
+        assert.equal(h.http.length, tokenSent ? 2 : 1);
+        assert.equal(h.sockets.length, tokenSent ? 1 : 0);
+        if (tokenSent) assert.equal(h.sockets[0].closed, true);
+      }
+    }
+  }
 });
 
 test('getConfig independently rejects unqualified versions or protocols before refresh', async () => {

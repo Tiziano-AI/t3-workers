@@ -64,18 +64,24 @@ identity reuse remove more user work than they create.
 
 ## A narrow quota seam
 
-T3 0.1.0, 0.1.1, and 0.1.2 expose provider quota through their first-party client
+T3 0.1.0, 0.1.1, 0.1.2, and 0.1.5 expose provider quota through their first-party client
 RPC, but not outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
 that read: environment discovery, a native WebSocket ticket, unary Effect RPC, and
 whitelisted account/window output. It has no dependencies beyond Node.js
 22.15+, no provider integrations, no cache and no process that stays alive.
 
 This is a source-visible **native client contract**, not a documented stable
-third-party quota API. The command accepts exactly 0.1.0, 0.1.1, and 0.1.2, all on
-protocol 2, and rejects other versions before sending a session token. Qualify
+third-party quota API. The command accepts exactly 0.1.0, 0.1.1, 0.1.2, and 0.1.5, all on
+protocol 2, and rejects other descriptor versions before sending a session token. Qualify
 new versions deliberately; do not silently widen the gate. Prefer a suitable
 native quota tool if T3 adds one, then retire this adapter rather than
 maintaining two ways to read the same data.
+
+For v0.1.5 it uses the audience-specific `/api/auth/websocket-ticket/rpc`
+route, not the broader media-capable bare ticket route. The authenticated
+config must match the descriptor's admitted version and environment before
+refresh. Qualification diagnostics distinguish pre-auth rejection from a
+post-auth config rejection without echoing credentials or raw config.
 
 The caller supplies a normal environment bearer session with
 `orchestration:read`. MCP OAuth credentials have a different audience and
@@ -110,8 +116,9 @@ Primary packaging sources:
 ## Qualification
 
 This is an **alpha** with a released T3 0.1.0 outside-agent baseline,
-discovery/project-default guidance for v0.1.2, and a quota reader admitting
-exactly 0.1.0, 0.1.1, and 0.1.2/protocol 2. Schema/source
+discovery/project-default guidance for v0.1.2, current outside-chief guidance
+checked at v0.1.5, and a quota reader admitting
+exactly 0.1.0, 0.1.1, 0.1.2, and 0.1.5/protocol 2. Schema/source
 checks, catalog fetching, host loading, authentication and successful worker
 execution are separate qualification steps; public availability does not
 establish them all.
@@ -125,10 +132,17 @@ reads requested no refresh or inference. They qualify transport and parsing,
 not fresh provider observations, available allowance, plugin installation or a
 worker cycle. The v0.1.2 quota/snapshot and auth/ticket contracts are
 source-compatible.
-Synthetic tests cover all three admitted versions and rejection of unknown
+Synthetic tests cover all four admitted versions and rejection of unknown
 versions, incompatible protocols and the wrong environment before credential
 transmission. Source compatibility and these live reads do not establish that
 a chief has loaded this source version.
+
+On 30 October 2026, a real v0.1.5/protocol 2 snapshot read from the updated
+source passed without refresh or inference. The tagged v0.1.5 descriptor,
+RPC-only ticket audience, protocol handshake and config/usage contracts were
+checked separately; their links are in the quota guide. This establishes
+transport and parsing of published native snapshots, not their freshness,
+usable allowance or selection by an installed chief.
 
 An independent read-only v0.1.2 acceptance check exercised live discovery,
 model search and recovery of an existing worker's configuration and state.
@@ -149,7 +163,7 @@ explicitly scoped environment:
 | Package loading | Native installation exposes the skill and its references in the intended chief; no duplicate MCP registration. |
 | Worker cycle | An idle worker has the selected account/model/options/workspace, then completes a useful bounded assignment and follow-up; the same thread is visible in T3. Repeat for each claimed provider path. |
 | Result retrieval | Needed long text and retained artifacts are actually read, not inferred from terminal status. |
-| Recovery | Rediscover by unique title without the launch receipt, reconcile a lost send and repeat an identical harmless send under the same key without an extra turn. |
+| Recovery | Rediscover by unique title without the launch receipt, repeat an identical keyed launch with the same `threadId` in v0.1.5, and reconcile/repeat an identical harmless send without an extra turn. |
 | Stop | Interrupt genuinely active work and inspect terminal state and surviving effects. |
 | Human approval | A separate supervised harmless write leaves the approval decision with the user in T3. |
 | Continuity | A returning chief recovers an existing worker without relaunching. If remote use is claimed, exercise that same chief through the actual remote client. |

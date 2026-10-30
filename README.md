@@ -17,8 +17,9 @@ it does not run another server or automatically route work between accounts.
 **Alpha.** You need your own T3 environment and a native Codex or Claude Code
 client with plugin support. The operating method uses released outside-agent
 MCP, introduced in **T3 0.1.0**, with discovery and project-default guidance
-for **0.1.2**. The optional quota reader accepts exactly **0.1.0, 0.1.1, and
-0.1.2 / protocol 2**. Host, provider and recovery paths are not all
+for **0.1.2** and current outside-chief guidance for **0.1.5**. The optional
+quota reader accepts exactly **0.1.0, 0.1.1, 0.1.2, and 0.1.5 / protocol 2**.
+Versions 0.1.3 and 0.1.4 have not been qualified. Host, provider and recovery paths are not all
 live-qualified. See
 [architecture and qualification](docs/architecture.md#qualification).
 
@@ -115,10 +116,10 @@ selections are preserved.
 
 ### Limits worth knowing
 
-- **Quota reads are optional and separate from MCP through T3 0.1.2.** The
+- **Quota reads are optional and separate from outside-agent MCP in T3 0.1.5 and the earlier qualified releases.** The
   bundled [quota reader](skills/t3-workers/references/limits.md) uses T3's native client
   RPC with a separately authorized read-only session. It requires Node.js
-  22.15+ and accepts exactly **T3 0.1.0, 0.1.1, and 0.1.2 / protocol 2**. It
+  22.15+ and accepts exactly **T3 0.1.0, 0.1.1, 0.1.2, and 0.1.5 / protocol 2**. It
   reports native account/window snapshots, not an automatic quota router;
   old values can survive a failed refresh. T3's authenticated **Usage → Limits** remains the
   fallback when no reader credential is available. Installing the plugin does
@@ -157,6 +158,9 @@ claude plugin update t3-workers@tiziano-ai --scope user
 ```
 
 Reload the supported host or start a new session and check the selected version.
+Check the same configuration home you installed into. A Claude session using
+an inline `--plugin-dir` or `--plugin-url` copy can shadow the marketplace
+plugin and does not receive that plugin's marketplace update.
 
 ## Remove
 

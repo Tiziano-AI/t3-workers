@@ -69,8 +69,8 @@ across providers are not equivalent token budgets, and another thread does not
 create more account capacity.
 
 Use a suitable native structured capacity tool if the connected release
-exposes one. Released T3 **through v0.1.2** does not expose this through
-outside-agent MCP. This package's optional reader uses the native client RPC instead:
+exposes one. Released T3 **v0.1.5**, like the earlier qualified releases,
+has no outside-agent MCP quota tool. This package's optional reader uses native client RPC instead:
 
 ```sh
 node "/absolute/path/to/installed/skills/t3-workers/scripts/t3-limits.mjs" --json
@@ -81,7 +81,7 @@ Replace the example path with this installed skill's directory. Read
 22.15+ and an explicitly supplied normal T3 read-only session, **not** the MCP
 OAuth credential. Do not issue a session as an unrequested preflight. Default
 to published snapshots; `--refresh` explicitly requests native status probes.
-The reader accepts exactly 0.1.0, 0.1.1, and 0.1.2/protocol 2 and covers native
+The reader accepts exactly 0.1.0, 0.1.1, 0.1.2, and 0.1.5/protocol 2 and covers native
 provider instances, not pooled external usage sources. Use the authenticated
 **Usage → Limits** UI when the reader is unavailable. Keep unknown capacity
 unknown; do not treat it as zero or unlimited, or block an authorized bounded
@@ -130,11 +130,23 @@ runtime mode within both the grant and the commission's actual authority.
    initial message and attachments**. Pass commissioned selections and modes,
    and the deliberate workspace binding; omit settings only when intentionally
    using the registered project's defaults within the caller's ceiling. Keep
-   its `threadId` and preparation state. Launch has no retry
-   key: an uncertain response requires reconciliation, never a blind relaunch.
-2. Read the prepared thread with `t3_thread_read` and
-   `t3_thread_configuration`. Confirm the provider instance, effective model
-   and options, runtime/interaction modes, project, and workspace binding.
+   its `threadId`, returned `modelSelection`, and preparation state. When the
+   connected schema supports launch `clientRequestId` (checked at v0.1.5), supply
+   a new key for each logical launch and retain it. Reuse it only for an
+   identical retry under the same sign-in: changed inputs under a used key
+   can return the earlier worker without an error. On older releases
+   without that field, reconcile an uncertain response before another launch.
+2. Read the prepared thread with `t3_thread_read`. Confirm the provider
+   instance, effective model, runtime/interaction modes, project, and workspace
+   binding; compare the launch's returned `modelSelection`, including options,
+   with the commission. In v0.1.5 the configuration read is part of
+   `t3_thread_configure`; pass only `{threadId}` for a read, never
+   `modelSelection` as a readback. Exposing this consolidated tool also exposes
+   model changes; the host owner must authorize that exposure separately from
+   OAuth. Use a supported configuration read or T3's authenticated UI when
+   options are not otherwise observable; keep an unresolved selection gap
+   explicit. Launch replay recovers an uncertain launch in its original
+   namespace; it is not a configuration read.
    Wait for preparation where necessary. If they do not match the commission,
    do not send work; resolve the mismatch through an authorized supported
    operation or report it. Do not accept a default that overrides an explicit
@@ -163,12 +175,16 @@ logical message its own request key.
   `textOffset = nextTextOffset` until that offset is null; offsets are UTF-16
   code units. Activity can explain blocked tools, partial effects, or failure
   that the messages view omits.
-- Use `t3_pending_request_list` and `t3_pending_request_read` for questions.
-  Answer through `t3_pending_request_respond` within this chief's delegated
-  authority and available context; bring user-owned choices to the user.
-  These tools **cannot approve security/permission requests**. Leave those
-  decisions to the user in T3's supported interface; do not answer a question
-  to bypass approval.
+- Inspect questions using only tools actually exposed by this connection.
+  In v0.1.5 the older `t3_pending_request_*` tools are combined into
+  `t3_pending_request` with `action: "list"`, `"read"`, or `"respond"`; pass the
+  target thread explicitly. Respond has no retry key: reconcile the pending
+  request after a lost reply before answering again. When no question
+  interface is exposed, use the thread activity and ask the user to inspect
+  the exact worker in T3. Answer supported question tools only within this
+  chief's delegated authority; bring user-owned choices to the user. A question
+  response **cannot approve a security/permission request**. Leave that
+  decision to the user in T3's supported interface.
 - Continue the same worker when its history matters; give it a focused
   follow-up and follow the resulting run. Use a new worker for a genuinely
   independent commission, not as a quota or permission workaround.
@@ -194,8 +210,11 @@ and [usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/u
 The released [v0.1.2 capability contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/orchestratorMcp.ts#L526-L561)
 and [project-default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169)
 qualify discovery and deliberate inheritance above. The reader's quota support
-uses the released [v0.1.2 native usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts);
-see its reference for version qualification, separate sessions, and freshness.
+uses the released [v0.1.5 native usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/providerUsageLimits.ts).
+The current [launch and keyed replay](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/project/handlers.ts#L63-L138)
+and [configuration/question operations](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/thread/tools.ts#L126-L162)
+are checked against released v0.1.5. See [Quota reader](references/limits.md)
+for version qualification, separate sessions, and freshness.
 Use current callable schemas for syntax and newly supported capabilities;
 neither this skill nor a pinned catalog proves what this host can invoke.
 Use [Connect the chief](references/setup.md) for installation and OAuth, not
