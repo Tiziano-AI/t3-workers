@@ -45,9 +45,10 @@ These references travel with the skill; they are not separate integrations.
    authentication, successful inference, or available quota. A missing host tool
    is not proof that the server lacks that operation. Do not repair configuration, log in, or grant
    access as an unrequested preflight.
-3. Act as an **outside chief**, not an internal T3 parent. `delegate_task`
-   and `task_status` act as the calling T3 thread, so a chief signed in from
-   outside T3 gets `thread_credential_required`. Launch ordinary top-level
+3. Act as an **outside chief**, not an internal T3 parent. `delegate_task`,
+   `task_status`, `task_cancel` and `t3_environment_link` act as or answer in
+   the calling T3 thread, so a chief signed in from outside T3 gets
+   `thread_credential_required`. Launch ordinary top-level
    workers with `t3_thread_launch` and follow them by thread ID. Supply target
    IDs explicitly instead of relying on calling-thread inheritance.
 4. Resolve the target **environment**. One chief connection reaches the
@@ -58,8 +59,9 @@ These references travel with the skill; they are not separate integrations.
    or substitute another route to that machine. A link that is expired, or a
    call refused because it expired, needs the user to link that machine again
    with a new pairing code from it: it is not a reason to fall back to another
-   machine, account or route. If T3 reports that linked environments are off,
-   only the user can turn them on (Settings → Labs).
+   machine, account or route. While linked environments are off, T3 hides its
+   link tools and refuses a call naming another machine with
+   `capability_denied`; only the user can turn them on (Settings → Labs).
 5. Resolve the intended provider **instance/account**, model, and requested
    effort or service tier from current discovery. Distinguish the provider
    driver from a configured account instance. A display name is a configured
@@ -70,8 +72,8 @@ These references travel with the skill; they are not separate integrations.
    do not copy the descriptive schema or knobs between providers. Preserve
    explicit user selections. A missing model, exhausted account, or unsupported
    option is a declared gap, not permission to switch silently or change global
-   defaults. **Always pass `modelSelection` on launch.** Since T3 0.1.4 a
-   launch without it takes the project default, and when that account's usage
+   defaults. **Always pass `modelSelection` on launch.** A launch without it
+   takes the project default, and since T3 0.1.4, when that account's usage
    window is exhausted and a fallback selection is configured for the project
    or environment, T3 starts the worker on that fallback account without an
    error. When the commission
@@ -200,7 +202,7 @@ grant and the commission's actual authority.
    is not evidence that an old key will still deduplicate.
 4. Follow the specific run with `t3_thread_wait`, passing its `runId` and an
    explicit `timeoutMs` within this host's tool-call limit. Without one, T3
-   holds the wait for up to 10 minutes (it accepts at most 60), and a host that
+   holds the wait for up to 10 minutes (it caps any longer value at 60), and a host that
    gives up first reports a failed call while the wait continues. Then read messages and
    relevant activity. A timeout leaves the work running. A terminal run can have
    failed or produced only part of the requested result; a completed turn is not

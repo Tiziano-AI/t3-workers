@@ -38,8 +38,8 @@ exist on another. [Discovery contract](https://github.com/pingdotgg/t3code/blob/
 A configured account label is not verified authenticated identity, and catalog
 presence is not provider health or spare quota.
 
-**An omitted `modelSelection` lets T3 choose the account.** Since 0.1.4 an
-outside launch without one takes the project's resolved default. When that
+**An omitted `modelSelection` lets T3 choose the account.** An outside launch
+without one takes the project's resolved default. Since 0.1.4, when that
 account has an exhausted usage window for the model and a fallback selection
 is configured for the project or environment, the worker starts on the
 fallback account, and the launch reports no error. Pass the selection
@@ -125,7 +125,7 @@ denylist fails open, because a new tool is exposed until it is added, but it
 survives renames of the tools the chief needs. Whether to filter, and how, is
 the host owner's choice; review the choice against each T3 release.
 [Codex tool filter](https://github.com/openai/codex/blob/67f0994b532b8740f14b5b738af7b7b2a915b1d6/codex-rs/codex-mcp/src/tools.rs#L63-L96),
-[deferred exposure](https://github.com/openai/codex/blob/67f0994b532b8740f14b5b738af7b7b2a915b1d6/codex-rs/core/src/mcp_tool_exposure.rs#L156-L160)
+[deferred exposure](https://github.com/openai/codex/blob/67f0994b532b8740f14b5b738af7b7b2a915b1d6/codex-rs/core/src/mcp_tool_exposure.rs#L158-L162)
 
 Since 0.1.4, launch supports optional **`clientRequestId`** (checked at
 v0.1.6); supply and retain it for a new logical launch. Releases 0.1.0–0.1.3
@@ -137,7 +137,7 @@ the same key can replay the first worker without a conflict error. Model
 changes and question responses have no retry key; reconcile them before repeating.
 Wait returns state, not the result, and timeout does not cancel work. Pass
 an explicit `timeoutMs` within the host's tool-call limit: without one T3 holds
-a wait for up to 10 minutes, and it accepts at most 60
+a wait for up to 10 minutes, and it caps any longer value at 60
 ([wait bounds](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L125-L126)).
 Read messages/activity and complete needed text pagination. Use the [recovery guide](recovery.md)
 before repeating a possibly accepted operation. [Launch replay](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/project/handlers.ts#L63-L138),
@@ -181,13 +181,16 @@ to the link's access, narrowed to the chief's own modes. Checked at v0.1.6:
 - A forwarded wait travels in pieces under a minute, so a long `timeoutMs`
   survives routes that drop idle requests.
 - A worker that a link started cannot use links itself.
-- While linked environments are off on the connected machine, a call naming
-  another machine fails with `capability_denied`; the user turns them on in
-  Settings → Labs.
+- While linked environments are off on the connected machine, T3 hides its
+  link tools, and a call naming another machine fails with
+  `capability_denied`; the user turns them on in Settings → Labs.
 - A link holds a sign-in on the linked machine that lasts 30 days and does
   not renew. Once it expires, calls fail with a message naming that machine;
   the user links it again with a new pairing code from it. Expiry is not a
-  reason to substitute another route, machine or account.
+  reason to substitute another route, machine or account. `t3_environment_link`
+  shows its request card in the calling T3 thread, so an outside chief cannot
+  raise it. A new link is a new sign-in there, so a retry key used before it
+  need not deduplicate after it.
 
 [Link tools](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/orchestrator/tools.ts#L308-L348),
 [forwarding](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerForwarding.ts#L94-L212),
