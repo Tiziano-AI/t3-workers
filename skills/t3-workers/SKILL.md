@@ -159,8 +159,9 @@ local configuration) at their owner, committed or copied to the deliverable's
 real location, before its thread goes quiet.
 
 Workers may run on a different host or lack the chief's integrations and
-files. Verify access to necessary sources; provide only authorized context,
-not an entire private conversation. T3 MCP is not a generic filesystem/file
+files. Verify access to necessary sources. Give each worker the context its
+work needs; a worker on another host or account receives only what that
+account is admitted for. T3 MCP is not a generic filesystem/file
 transfer surface: a call forwarded to a linked environment cannot carry
 attachments (checked at v0.1.6), so put needed material where that machine can
 read it and name the location in the brief. A worker started over a link
