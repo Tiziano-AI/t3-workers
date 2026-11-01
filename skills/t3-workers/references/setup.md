@@ -98,15 +98,36 @@ OAuth callbacks or paste secrets into chat. See [T3 outside-agent setup](https:/
 [native Codex MCP](https://learn.chatgpt.com/docs/extend/mcp#connect-an-existing-mcp-server)
 and [Claude MCP](https://code.claude.com/docs/en/mcp).
 
+When the person asks the chief to start the login from its own shell, that
+shell is not a terminal; a Claude Code chief's shell, for example, reads
+standard input from `/dev/null`. Two host behaviors follow (Codex CLI 0.166.0,
+Claude Code 2.1.316). Run Codex without `--no-browser`: `codex mcp login t3`
+prints the sign-in address, opens it in the browser of the machine running the
+login and waits up to five minutes without reading standard input; with
+`--no-browser` it reads the final URL from standard input and stops as soon as
+that input ends. `claude mcp login` deletes its stored token and then gives up
+unless standard input is a terminal. On macOS,
+`script -q /dev/null claude mcp login t3 --no-browser < <(sleep 300)` provides
+a terminal and keeps its input open, since `script` passes the end of its own
+input on and that cancels the login; the `sleep` ends on its own. Both logins
+wait up to five minutes, so give the call longer than that or run it in the
+background: stopping it early abandons the attempt and leaves a Claude chief
+signed out. Approval returns to a `localhost` address on the computer that
+opened the page, so the person opens the page on the machine running the
+login, enters the pairing code and chooses the access. Opened elsewhere, the
+page's final URL has to be pasted into the CLI's own prompt, which a chief's
+shell cannot take without passing it through chat; the person then runs the
+login in their own terminal instead.
+
 ## Consent and the three kinds of authentication
 
 - **Provider authentication** lets T3 use a particular provider account.
 - **Device pairing** connects a T3 client to the environment.
 - **Outside-agent OAuth** grants this chief access to the environment's MCP.
 
-One does not replace the others. A pairing code from the authenticated T3
-Settings → Connections page (or its native pairing command) can participate in
-the consent flow; it is **not** the MCP bearer credential.
+One does not replace the others. A pairing code from T3's **Settings → Sharing
+& access** (or `t3 auth pairing create` on the host) can participate in the
+consent flow; it is **not** the MCP bearer credential.
 
 The human completes OAuth consent. In T3 **0.1.0**, **Full access** is an
 environment-wide bundle: `orchestration:read`, `orchestration:operate`,
@@ -130,14 +151,74 @@ shapes. This guide does not enforce host controls.
 ### Grants expire
 
 A chief's MCP sign-in lasts **30 days** from approval, and so does each link
-between environments; neither renews itself. When one lapses, the chief's
-calls or the link's calls fail until a person approves again: the chief's
-sign-in through the native login flow, a link with a new pairing code from the
-linked machine. Note the expiry dates and renew them deliberately. A chief
-whose connection is optional at startup keeps working without T3 once its
-sign-in lapses, so check the connection rather than inferring it from silence.
+between environments. Neither renews itself, and in 0.1.6 the sign-in flow
+cannot make either longer: it issues a fixed 30-day session and no refresh
+token. A longer-lived token minted on the host with `t3 auth session issue` is
+no substitute: T3's MCP endpoint refuses it unless it is minted as an agent
+sign-in, and even then it carries no signed permission ceiling, so T3 caps it
+at Supervised, and a chief could send it only as the static `Authorization`
+header this guide rules out. When a grant lapses, the chief's calls or the
+link's calls fail until a person approves again: the chief's sign-in through
+the native login flow, a link with a new pairing code from the linked machine.
+`t3_environment_links` shows each link's `expiresAt`, and on the host
+`t3 auth session list` shows each agent sign-in's `issued` and `expires`
+times. A chief whose connection is optional at startup keeps working without
+T3 once its sign-in lapses, so check the connection rather than inferring it
+from silence.
 [Sign-in lifetime](https://github.com/pingdotgg/t3code/blob/v0.1.6/docs/user/outside-agents.md#remove-an-agent),
-[link expiry](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerLinks.ts#L535-L552)
+[fixed lifetime](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/auth/EnvironmentAuth.ts#L73-L74),
+[no refresh token](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/auth/McpOAuth.ts#L541-L546),
+[unsigned ceiling](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/auth/EnvironmentAuth.ts#L1294-L1300),
+[link expiry](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerLinks.ts#L537-L552)
+
+### Renew before a grant lapses
+
+On T3, approving again does not revoke the current grant, so renewal can happen
+at any time before expiry rather than after calls fail:
+
+1. When the person asks for renewal, run the chief's native login again. The
+   person approves the sign-in page and chooses the access again: the page
+   defaults to **Read only**, and the new sign-in carries the access chosen
+   now, not the old one's. T3 issues a second sign-in with its own 30 days;
+   the old one stays valid until it expires or is revoked.
+2. Use the executable and configuration the chief itself runs with. Claude
+   Code keeps MCP sign-ins per `CLAUDE_CONFIG_DIR`. Codex keys them by server
+   name and URL: on macOS and Linux by default in the OS keychain, which every
+   `CODEX_HOME` on the machine shares, or in `CODEX_HOME/.credentials.json`
+   when file storage is set. A login under another configuration can
+   therefore store a credential the chief never reads, or replace the one
+   other Codex homes use.
+3. `claude mcp login` deletes Claude Code's stored token for the server before
+   it opens the sign-in, and Codex saves only after approval. Until a Claude
+   renewal is approved, a Claude chief that needs its stored credential has
+   none, and an abandoned attempt leaves it signed out even though T3 still
+   honors the old sign-in. Start a Claude renewal only when the person
+   can approve it straight away.
+4. A chief that is already running may keep calling with the sign-in it
+   loaded when it started. Before the old sign-in expires, reload its MCP
+   connection with the host's own control (in Claude Code, `/mcp`) or start a
+   new session, then [check the connection](#check-the-connection-where-it-will-be-used).
+   Reload between dispatches: a retry key used under the old sign-in need not
+   deduplicate under the new one, so reconcile an uncertain launch or send by
+   reading the thread first.
+5. T3 records no last use for agent sign-ins (`t3 auth session list` shows
+   `last connected: never`), and the old and new sign-ins carry the same name.
+   Let the old one lapse, or, once every chief that used it has reloaded,
+   revoke the one with the earlier `issued` time, with
+   `t3 auth session revoke <session-id>` against the running server's T3 home
+   or under **Settings → Sharing & access**.
+
+A link renews the same way. Before its `expiresAt`, the person links that
+machine again with a new pairing code from it. T3 replaces the link's stored
+sign-in in place, so forwarded calls keep working; the old sign-in stays on
+the linked machine until it expires or is revoked there. As with any new link,
+a retry key used before it need not deduplicate after it.
+[Renew a link](https://github.com/pingdotgg/t3code/blob/v0.1.6/docs/user/remote-access.md#link-another-environment),
+[linking again](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerLinks.ts#L442-L478)
+
+Paired T3 clients, such as a desktop app connected to a remote environment,
+hold sessions of their own. Renewing the chief's sign-in does not renew them,
+and they do not affect it.
 
 ## Check the connection where it will be used
 

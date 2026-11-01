@@ -23,9 +23,10 @@ anything. For a new commission, follow the idle-first sequence below. Before
 retrying a lost response, changing an active assignment, or handing work back
 unfinished, read [Recovery and continuity](references/recovery.md).
 
-If tools are missing or the user requests connection/setup, read
-[Connect the chief](references/setup.md). For capability, quota, memory, or
-transport questions, read [Capability boundaries](references/capabilities.md).
+If tools are missing, a sign-in or link nears its 30-day expiry, or the user
+requests connection/setup, read [Connect the chief](references/setup.md). For
+capability, quota, memory, or transport questions, read
+[Capability boundaries](references/capabilities.md).
 These references travel with the skill; they are not separate integrations.
 
 ## Establish the callable connection and selection

@@ -139,6 +139,9 @@ selections are preserved.
   keep unique ignored outputs at their owner before their thread goes quiet.
 - **Sign-ins and links expire after 30 days.** Neither the chief's MCP sign-in
   nor a link between environments renews itself; a person approves again.
+  Approving again before expiry leaves the current grant working on T3, so
+  renew early; see
+  [Renew before a grant lapses](skills/t3-workers/references/setup.md#renew-before-a-grant-lapses).
 - **Pass the model explicitly.** A launch without `modelSelection` takes the
   project default and, since T3 0.1.4, can move to a configured fallback
   account when the default's usage is exhausted.
