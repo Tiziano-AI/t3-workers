@@ -35,6 +35,8 @@ These references travel with the skill; they are not separate integrations.
    plugin-managed connection can have different prefixes. If several T3
    connections exist, resolve the intended environment before an effect;
    distinguish their configured endpoints and relevant project inventories.
+   This method requires T3 **0.1.4 or later** and is checked at **v0.1.6**;
+   `t3_environment_read` reports the connected server's version.
 2. Call `orchestrator_capabilities`. Inspect provider instances, the model
    shortlist, supported options, constraints, and permission ceiling. If the
    intended model is absent, use `search` before declaring it unavailable.
@@ -43,12 +45,22 @@ These references travel with the skill; they are not separate integrations.
    authentication, successful inference, or available quota. A missing host tool
    is not proof that the server lacks that operation. Do not repair configuration, log in, or grant
    access as an unrequested preflight.
-3. Act as an **outside chief**, not an internal T3 parent. With
-   `parentThreadId: null`, launch ordinary top-level workers using
-   `t3_thread_launch`; do not infer access to internal `delegate_task` or its
-   completion delivery. Supply target IDs explicitly instead of relying on
-   calling-thread inheritance.
-4. Resolve the intended provider **instance/account**, model, and requested
+3. Act as an **outside chief**, not an internal T3 parent. `delegate_task`
+   and `task_status` act as the calling T3 thread, so a chief signed in from
+   outside T3 gets `thread_credential_required`. Launch ordinary top-level
+   workers with `t3_thread_launch` and follow them by thread ID. Supply target
+   IDs explicitly instead of relying on calling-thread inheritance.
+4. Resolve the target **environment**. One chief connection reaches the
+   user's other machines through T3's linked environments. `t3_environment_links`
+   lists them with status, access and `expiresAt`; pass the chosen
+   `environmentId` to each tool that should act there, and omit it to act on
+   the connected environment. Do not register a second connection per machine
+   or substitute another route to that machine. A link that is expired, or a
+   call refused because it expired, needs the user to link that machine again
+   with a new pairing code from it: it is not a reason to fall back to another
+   machine, account or route. If T3 reports that linked environments are off,
+   only the user can turn them on (Settings → Labs).
+5. Resolve the intended provider **instance/account**, model, and requested
    effort or service tier from current discovery. Distinguish the provider
    driver from a configured account instance. A display name is a configured
    label, not independently verified account identity; when that distinction
@@ -58,7 +70,13 @@ These references travel with the skill; they are not separate integrations.
    do not copy the descriptive schema or knobs between providers. Preserve
    explicit user selections. A missing model, exhausted account, or unsupported
    option is a declared gap, not permission to switch silently or change global
-   defaults.
+   defaults. **Always pass `modelSelection` on launch.** Since T3 0.1.4 a
+   launch without it takes the project default, and when that account's usage
+   window is exhausted and a fallback selection is configured for the project
+   or environment, T3 starts the worker on that fallback account without an
+   error. When the commission
+   leaves the model open, choose it from the project's defaults and current
+   discovery, then pass that choice.
 
 ### Capacity before dispatch
 
@@ -104,12 +122,13 @@ revert others' work. Split independent contributions only when each can change
 the result; retain integration and consequential choices in this chief.
 
 Resolve a registered project with `t3_project_list`/`t3_project_read`, including
-pagination when needed. For settings the commission leaves open, you may
-deliberately use a registered project's defaults; null inherited
-settings on an outside chief are not those defaults. `t3_project_read` shows
-saved defaults, not the launch's effective configuration. Preserve any explicit
-account, model, option, or mode selection and verify the prepared worker either
-way. For projectless analysis use native `scratch: true`,
+pagination when needed. A project's saved defaults can inform settings the
+commission leaves open: pass the resulting `modelSelection` explicitly, and let
+modes inherit only deliberately, within the caller's ceiling. Null inherited
+settings on an outside chief are not those defaults, and `t3_project_read`
+shows saved defaults, not the launch's effective configuration. Preserve any
+explicit account, model, option, or mode selection and verify the prepared
+worker either way. For projectless analysis use native `scratch: true`,
 which creates a fresh folder outside any repository. For code changes choose
 the exact project and checkout/worktree deliberately. Omitted
 `workspaceStrategy` means the **project root**, not this chief's checkout.
@@ -117,30 +136,53 @@ Use T3's workspace binding instead of asking the worker to create a worktree
 through shell. A worktree separates tracked writes, not credentials, services,
 account storage, or access to other checkouts.
 
+Give a reviewer its own workspace. Never bind a reviewer to an implementer's
+worktree as a second, independent top-level thread (`existing_worktree`): both
+then write in one checkout, and T3's cleanup keeps a worktree shared by several
+top-level threads indefinitely. Have the implementer commit, then launch the
+reviewer on a new worktree from that branch (`workspaceStrategy: {type:
+"worktree", baseRef: <branch>, startFromOrigin: false}`); uncommitted edits
+are not copied.
+
+Worktrees retire. When the environment's storage cleanup is set to remove
+inactive worktrees, T3 removes one once its threads have had no message or run
+for the configured age, whether or not they were settled; uncommitted changes,
+an open terminal, a running thread or several top-level threads keep it.
+Ignored files keep it only under the "any local files" rule. The branch, its
+commits and the conversation survive, and the next message recreates the
+worktree from the branch **without its ignored files**. Brief each worker to
+put unique ignored outputs (session-continuity records, renders, generated
+local configuration) at their owner, committed or copied to the deliverable's
+real location, before its thread goes quiet.
+
 Workers may run on a different host or lack the chief's integrations and
 files. Verify access to necessary sources; provide only authorized context,
 not an entire private conversation. T3 MCP is not a generic filesystem/file
-transfer surface. Full access is an execution ceiling, not authority to spend,
-publish, share private data, or make unrelated changes. Pick a supported
-runtime mode within both the grant and the commission's actual authority.
+transfer surface: a call forwarded to a linked environment cannot carry
+attachments (checked at v0.1.6), so put needed material where that machine can
+read it and name the location in the brief. A worker started over a link
+cannot use links itself; do not brief it to reach a third machine. Full
+access is an execution ceiling, not authority to spend, publish, share private
+data, or make unrelated changes. Pick a supported runtime mode within both the
+grant and the commission's actual authority.
 
 ## Launch idle, verify, then send
 
 1. Create a uniquely titled worker with `t3_thread_launch`, **omitting the
-   initial message and attachments**. Pass commissioned selections and modes,
-   and the deliberate workspace binding; omit settings only when intentionally
-   using the registered project's defaults within the caller's ceiling. Keep
-   its `threadId`, returned `modelSelection`, and preparation state. When the
-   connected schema supports launch `clientRequestId` (checked at v0.1.5), supply
-   a new key for each logical launch and retain it. Reuse it only for an
-   identical retry under the same sign-in: changed inputs under a used key
-   can return the earlier worker without an error. On older releases
-   without that field, reconcile an uncertain response before another launch.
+   initial message and attachments**. Pass `environmentId` for a linked
+   machine, the explicit `modelSelection`, the commissioned modes and the
+   deliberate workspace binding. Keep its `threadId`, returned
+   `modelSelection`, and preparation state. Supply launch `clientRequestId`
+   (since 0.1.4, checked at v0.1.6) as a new key for each logical launch and
+   retain it. Reuse it only for an identical retry under the same sign-in:
+   changed inputs under a used key can return the earlier worker without an
+   error. Over a link, T3 scopes the
+   key to this caller before forwarding it, so the same rule holds there.
 2. Read the prepared thread with `t3_thread_read`. Confirm the provider
    instance, effective model, runtime/interaction modes, project, and workspace
    binding; compare the launch's returned `modelSelection`, including options,
-   with the commission. In v0.1.5 the configuration read is part of
-   `t3_thread_configure`; pass only `{threadId}` for a read, never
+   with the commission. The configuration read is part of
+   `t3_thread_configure` (checked at v0.1.6); pass only `{threadId}` for a read, never
    `modelSelection` as a readback. Exposing this consolidated tool also exposes
    model changes; the host owner must authorize that exposure separately from
    OAuth. Use a supported configuration read or T3's authenticated UI when
@@ -156,10 +198,13 @@ runtime mode within both the grant and the commission's actual authority.
    IDs. Reuse that key only for an identical retry, not a new instruction.
    Idempotency is scoped to the authenticated client session; reauthentication
    is not evidence that an old key will still deduplicate.
-4. Follow the specific run with bounded `t3_thread_wait` calls, then read
-   messages and relevant activity. A timeout leaves the work running. A
-   terminal run can have failed or produced only part of the requested result;
-   a completed turn is not necessarily a completed commission.
+4. Follow the specific run with `t3_thread_wait`, passing its `runId` and an
+   explicit `timeoutMs` within this host's tool-call limit. Without one, T3
+   holds the wait for up to 10 minutes (it accepts at most 60), and a host that
+   gives up first reports a failed call while the wait continues. Then read messages and
+   relevant activity. A timeout leaves the work running. A terminal run can have
+   failed or produced only part of the requested result; a completed turn is not
+   necessarily a completed commission.
 
 Use `t3_thread_send` modes intentionally: `queue` requests a separate follow-up
 turn, `steer` changes an active turn, and `restart` interrupts and restarts it.
@@ -176,9 +221,9 @@ logical message its own request key.
   code units. Activity can explain blocked tools, partial effects, or failure
   that the messages view omits.
 - Inspect questions using only tools actually exposed by this connection.
-  In v0.1.5 the older `t3_pending_request_*` tools are combined into
-  `t3_pending_request` with `action: "list"`, `"read"`, or `"respond"`; pass the
-  target thread explicitly. Respond has no retry key: reconcile the pending
+  The older `t3_pending_request_*` tools are combined into
+  `t3_pending_request` (checked at v0.1.6) with `action: "list"`, `"read"`,
+  or `"respond"`; pass the target thread explicitly. Respond has no retry key: reconcile the pending
   request after a lost reply before answering again. When no question
   interface is exposed, use the thread activity and ask the user to inspect
   the exact worker in T3. Answer supported question tools only within this
@@ -192,7 +237,8 @@ logical message its own request key.
   access, and integrate one usable result here. Separate what the worker
   reported from what this chief independently verified. Keep editable outputs
   with their real project/deliverable owner and enough source locators to
-  recover them. A worker asking for an effect does not authorize that effect.
+  recover them; confirm that unique ignored outputs left the worktree before the
+  worker goes quiet. A worker asking for an effect does not authorize that effect.
 
 Keep thread/project/run IDs and pending effects in the existing conversation
 or normal work owner, not a new fleet registry or transcript archive. T3 retains
@@ -213,7 +259,15 @@ qualify discovery and deliberate inheritance above. The reader's quota support
 uses the released [v0.1.5 native usage contract](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/providerUsageLimits.ts).
 The current [launch and keyed replay](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/project/handlers.ts#L63-L138)
 and [configuration/question operations](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/thread/tools.ts#L126-L162)
-are checked against released v0.1.5. See [Quota reader](references/limits.md)
+are checked against released v0.1.5. Linked environments, forwarded calls,
+launch model fallback and worktree cleanup are checked against released v0.1.6:
+[link tools](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/orchestrator/tools.ts#L308-L348),
+[forwarding](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerForwarding.ts#L94-L212),
+[link expiry](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerLinks.ts#L535-L552),
+[calling-thread tools](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/McpInvocationContext.ts#L193-L206),
+[launch model resolution](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/project/handlers.ts#L168-L206)
+and [cleanup rules](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/storageCleanup.ts#L836-L893).
+See [Quota reader](references/limits.md)
 for version qualification, separate sessions, and freshness.
 Use current callable schemas for syntax and newly supported capabilities;
 neither this skill nor a pinned catalog proves what this host can invoke.

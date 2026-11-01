@@ -5,6 +5,7 @@
 ```text
 User → native Codex or Claude Code chief
      → existing native authenticated T3 MCP connection
+     → optionally a linked environment, named by environmentId
      → explicitly selected visible T3 worker
      → retrieved result assessed by the chief
 ```
@@ -25,6 +26,14 @@ the chief still preserves explicit selections and checks the idle worker's
 effective configuration before dispatch. Saved project settings alone are not
 that readback. [Discovery](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/orchestratorMcp.ts#L526-L561),
 [default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169).
+
+Cross-machine work uses T3's own linked environments (since 0.1.4): one chief
+connection, a discovered `environmentId` per call, and T3 forwarding the call
+within the link's access and the chief's modes. The plugin adds no
+per-machine registration, relay or alternative route, and an expired link is
+renewed by a person rather than worked around. A launch always carries an
+explicit `modelSelection`, because an omitted one can move to a configured
+fallback account when the default's usage is exhausted.
 
 The native v0.1.2 thread CLI serves local scripts, but lacks controls needed by
 this cycle, including idle-first launch, model options and caller-supplied
@@ -75,7 +84,10 @@ third-party quota API. The command accepts exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 an
 protocol 2, and rejects other descriptor versions before sending a session token. Qualify
 new versions deliberately; do not silently widen the gate. Prefer a suitable
 native quota tool if T3 adds one, then retire this adapter rather than
-maintaining two ways to read the same data.
+maintaining two ways to read the same data. An
+[open upstream proposal](https://github.com/pingdotgg/t3code/pull/26439) would
+return usage from `orchestrator_capabilities` behind an environment setting;
+until a release carries it, the reader stays exact-version.
 
 For v0.1.5 and v0.1.6 it uses the audience-specific `/api/auth/websocket-ticket/rpc`
 route, not the broader media-capable bare ticket route. The authenticated
@@ -115,9 +127,11 @@ Primary packaging sources:
 
 ## Qualification
 
-This is an **alpha** with a released T3 0.1.0 outside-agent baseline,
-discovery/project-default guidance for v0.1.2, current outside-chief guidance
-checked at v0.1.5, and a quota reader admitting
+This is an **alpha** that requires T3 0.1.4 or later, with a released T3
+0.1.0 outside-agent baseline, discovery/project-default guidance for v0.1.2,
+outside-chief exposure and recovery checked at v0.1.5, linked environments,
+launch model resolution and worktree cleanup checked at v0.1.6, and a quota
+reader admitting
 exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2. Schema/source
 checks, catalog fetching, host loading, authentication and successful worker
 execution are separate qualification steps; public availability does not
@@ -170,7 +184,9 @@ explicitly scoped environment:
 | Package loading | Native installation exposes the skill and its references in the intended chief; no duplicate MCP registration. |
 | Worker cycle | An idle worker has the selected account/model/options/workspace, then completes a useful bounded assignment and follow-up; the same thread is visible in T3. Repeat for each claimed provider path. |
 | Result retrieval | Needed long text and retained artifacts are actually read, not inferred from terminal status. |
-| Recovery | Rediscover by unique title without the launch receipt, repeat an identical keyed launch with the same `threadId` in v0.1.5, and reconcile/repeat an identical harmless send without an extra turn. |
+| Recovery | Rediscover by unique title without the launch receipt, repeat an identical keyed launch that returns the same `threadId`, and reconcile/repeat an identical harmless send without an extra turn. |
+| Linked environment | Discover a linked machine, launch, follow and read a worker there by `environmentId`, and observe an expired link fail with a re-link instruction rather than a fallback. |
+| Retention | A worker keeps its unique ignored outputs at their owner before going quiet; after cleanup retires its worktree, the next message recreates it from the branch. |
 | Stop | Interrupt genuinely active work and inspect terminal state and surviving effects. |
 | Human approval | A separate supervised harmless write leaves the approval decision with the user in T3. |
 | Continuity | A returning chief recovers an existing worker without relaunching. If remote use is claimed, exercise that same chief through the actual remote client. |

@@ -10,12 +10,18 @@ The T3 server owns projects, files, provider accounts and worker conversations.
 Desktop, browser and phone are clients of that environment. A phone opening T3
 does not turn it into the machine running the workers.
 
-Use a released T3 server with the outside-agent MCP contract, introduced in
-**0.1.0**. Verify the running server, not only the desktop's version. Obtain its
-exact MCP URL. `http://127.0.0.1:3773/mcp` applies only when the chief executes
+Use a released T3 server, **0.1.4 or later**: the outside-agent MCP contract
+arrived in 0.1.0, and linked environments and keyed launches in 0.1.4. Verify
+the running server, not only the desktop's version. Obtain its exact MCP URL.
+`http://127.0.0.1:3773/mcp` applies only when the chief executes
 on the same machine as that server. Remote chiefs need their own reachable,
 authenticated route; pairing does not create network reachability. Do not open
 an unauthenticated public port as a connection fix.
+
+Connect the chief to **one** environment. The user's other machines are
+reached through T3's linked environments, which the user sets up in T3; the
+chief then passes a linked machine's `environmentId` on each call. Do not add
+a separate chief registration for each machine.
 
 T3's [installation guide](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/install.md)
 distinguishes the desktop app from the standalone CLI. In particular,
@@ -111,10 +117,27 @@ store, never in this plugin, briefs or workers. Do not copy provider tokens or
 add an `Authorization` header as an OAuth workaround. [Released grant contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/auth/EnvironmentAuth.ts#L73-L100)
 
 Keep the connection non-required at chief startup where the host supports it.
-Choose host tool exposure and approval policy separately from the server grant:
-the operating cycle does not need destructive administration or internal T3
-tools. A broad grant does not require exposing every server tool to the model.
-This guide is not enforcement of those host controls.
+Choose host tool exposure and approval policy separately from the server grant.
+A Codex host needs no `enabled_tools` list: without one, every tool T3 lists is
+exposed, and where the host loads MCP tools on demand an unfiltered server adds
+little context. An allowlist matches exact names and silently hides tools a T3
+release renames, merges or adds. If the host owner wants a brake where no
+approval prompt appears, a short `disabled_tools` denylist of administration
+and scheduling tools fails open but survives renames. The choice is the host
+owner's; [Host tool filters](capabilities.md#host-tool-filters) explains both
+shapes. This guide does not enforce host controls.
+
+### Grants expire
+
+A chief's MCP sign-in lasts **30 days** from approval, and so does each link
+between environments; neither renews itself. When one lapses, the chief's
+calls or the link's calls fail until a person approves again: the chief's
+sign-in through the native login flow, a link with a new pairing code from the
+linked machine. Note the expiry dates and renew them deliberately. A chief
+whose connection is optional at startup keeps working without T3 once its
+sign-in lapses, so check the connection rather than inferring it from silence.
+[Sign-in lifetime](https://github.com/pingdotgg/t3code/blob/v0.1.6/docs/user/outside-agents.md#remove-an-agent),
+[link expiry](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerLinks.ts#L535-L552)
 
 ## Check the connection where it will be used
 
@@ -130,9 +153,10 @@ If tools are missing, distinguish these cases before changing anything:
 | --- | --- |
 | Plugin skill is missing | Check marketplace, installed version and host reload; this is not a T3 service failure. |
 | Skill loads, but T3 tools do not | Inspect the native MCP registration and discovery/enablement in this chief. |
-| Some expected tools are missing after a T3 update | Compare the host allowlist with actual discovery. Checked at v0.1.5, the older configuration reader is folded into `t3_thread_configure` and the three `t3_pending_request_*` tools into `t3_pending_request`. Allowing `configure` exposes both reading and model changes, not just a renamed reader; the host owner must authorize that exposure. Do not remove the allowlist or broaden OAuth or permissions. |
+| Some expected tools are missing after a T3 update | Compare any host tool filter with actual discovery. An `enabled_tools` allowlist hides tools a release renamed, merged or added: the configuration reader is folded into `t3_thread_configure`, the three `t3_pending_request_*` tools into `t3_pending_request`, and `t3_environment_links` arrived in 0.1.4. Exposing `configure` exposes both reading and model changes. The host owner decides whether to update the allowlist, replace it with a short `disabled_tools` denylist, or drop the filter; none of these broadens OAuth or permissions. |
 | Endpoint is unreachable | Check the selected route and existing service status; do not launch a second server. |
-| Authentication or scope is rejected | Inspect the exact connection/grant and native login state; do not substitute accounts. |
+| Authentication or scope is rejected | Inspect the exact connection/grant and native login state; a sign-in older than 30 days has expired. Do not substitute accounts. |
+| A linked machine is expired or unreachable | Read `t3_environment_links` for its status and last error. An expired link needs the user to link it again with a new pairing code from that machine; do not route around it. |
 | Client reports a protocol mismatch | Identify the server/client owner and follow T3's update guidance; no blind reinstall or data-root switch. |
 
 Use the refresh controls the current host offers. An application restart affects

@@ -36,14 +36,16 @@ session; they do not apply to the native `t3 thread` CLI.
 
 | What is uncertain | Safe continuation |
 | --- | --- |
-| MCP launch response was lost | In released v0.1.5, when `clientRequestId` was supplied, retry the identical launch with that original key in the same authenticated client session, then read the returned thread. Without that supported key (including older releases), recover by unique title and project enumeration as above. Do not create another thread merely because its response is missing. After reauthentication, reconcile without assuming the former namespace survived. |
+| MCP launch response was lost | Since 0.1.4 (checked at v0.1.6), when `clientRequestId` was supplied, retry the identical launch with that original key and the same `environmentId` in the same authenticated client session, then read the returned thread. Without that key, recover by unique title and project enumeration in the target environment as above. Do not create another thread merely because its response is missing. After reauthentication, reconcile without assuming the former namespace survived. |
 | MCP send response was lost | Read the target timeline and run state. If retry is needed, use the identical payload and original `clientRequestId` within the same authenticated client session. Do not issue a new key to recover the same assignment. After reauthentication, reconcile without assuming the former deduplication namespace survived. |
-| Configuration change or question response was lost | In v0.1.5 these operations have no request key. Read the effective configuration or list/read the exact pending request before repeating. Do not treat a read-only `t3_thread_configure {threadId}` as a model change. |
+| Configuration change or question response was lost | These operations have no request key (checked at v0.1.6). Read the effective configuration or list/read the exact pending request before repeating. Do not treat a read-only `t3_thread_configure {threadId}` as a model change. |
 | Native CLI start/send response was lost | Recover the thread and read its timeline/run state before another command. `start` may already have created the worker; `send` always queues and offers no caller-supplied retry key. Repeating it can create another turn. |
-| Wait timed out or the chief went away | Read/wait on the existing run. A timeout neither cancels the run nor authorizes resending its brief. Avoid repeatedly reading unchanged full transcripts; retain the relevant cursor. |
+| Wait timed out or the chief went away | Read/wait on the existing run with an explicit `timeoutMs` within the host's tool-call limit; a host-side timeout is as uncertain as T3's. A timeout neither cancels the run nor authorizes resending its brief. Avoid repeatedly reading unchanged full transcripts; retain the relevant cursor. |
+| A linked machine's call failed | Read `t3_environment_links`. If the link expired, the worker's thread stays on that machine: the user links the machine again with a new pairing code from it, then recover the worker by its IDs with the same `environmentId`. Do not relaunch the assignment on another machine, account or route. If the link is only unreachable, retry the read later rather than repeating an effect. |
 | Run is waiting | Inspect activity and pending questions. A zero question count does not rule out a human security approval. Use the supported human interface for permissions. |
 | Provider failed, account is exhausted, or quota is unknown | Preserve any result and report the precise gap. Do not change account/model, consume a reset, reauthenticate, or launch a replacement without the necessary authority. Distinguish observed failure from stale or unavailable capacity information. |
 | Worker says it is done | Read the complete needed result, check the requested output and known effects. Terminal status alone does not establish a successful commission or artifact delivery. |
+| A worker's worktree is gone | T3's storage cleanup may have retired it after inactivity. The branch, commits and conversation remain, and the next message recreates the worktree from the branch without its ignored files. Recover what the branch holds; outputs that lived only in ignored files are gone unless they were kept elsewhere. |
 
 ## Interrupt a real run
 
@@ -69,6 +71,11 @@ On the chief's return, recover the existing worker and inspect what happened
 since the last known position. Do not relaunch its assignment. Continue with a
 new logical message only when the current task requires it, preserving any
 unanswered human decision.
+
+Before a worker's thread goes quiet, confirm that its unique ignored outputs
+(session-continuity records, renders, generated local configuration) are at
+their owner: committed, or copied to the deliverable's real location. Storage
+cleanup can retire an inactive worktree with its ignored files.
 
 When leaving a worker running, tell the user what it is doing, its current
 observed state, how its result will be recovered, and how to stop it. Record

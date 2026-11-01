@@ -4,10 +4,13 @@ Read this when deciding whether T3 fits an assignment, interpreting quota, or
 explaining what remote access and returned results actually provide. The
 outside-agent baseline below is **released T3 v0.1.0**, with discovery and
 project-default changes checked in **released v0.1.2** and outside-chief
-exposure/recovery checked in **released v0.1.5**. Quota contract support
-is source-checked for 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6; source support and a live read are separate
-claims. This does not assert that intervening or later contracts are identical. Use the
-connected tool schemas for current syntax and exposure.
+exposure/recovery checked in **released v0.1.5**. The method requires **T3
+0.1.4 or later**; linked environments, launch model resolution and worktree
+cleanup are checked in **released v0.1.6**. Quota contract support is
+source-checked for 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6; source support and a
+live read are separate claims. This does not assert that intervening or later
+contracts are identical. Use the connected tool schemas for current syntax and
+exposure.
 
 ## What each side owns
 
@@ -34,6 +37,15 @@ exist on another. [Discovery contract](https://github.com/pingdotgg/t3code/blob/
 
 A configured account label is not verified authenticated identity, and catalog
 presence is not provider health or spare quota.
+
+**An omitted `modelSelection` lets T3 choose the account.** Since 0.1.4 an
+outside launch without one takes the project's resolved default. When that
+account has an exhausted usage window for the model and a fallback selection
+is configured for the project or environment, the worker starts on the
+fallback account, and the launch reports no error. Pass the selection
+explicitly and compare the returned `modelSelection` with it.
+[Launch resolution](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/project/handlers.ts#L168-L206),
+[usage fallback](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/shared/src/usageLimits.ts#L64-L101)
 
 **Released v0.1.6, like the earlier qualified releases, has no outside-agent MCP quota read.** The bundled
 [quota reader](limits.md) reads T3's native provider snapshots through its
@@ -73,14 +85,14 @@ attachments, creates a fresh nonrepository folder. Do not combine it with
 and deliberate root/worktree strategy; project root is not the chief's working
 directory. [Launch contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/mcp/toolkits/project/tools.ts#L104-L140)
 
-In v0.1.2 an outside launch can inherit a registered project's resolved model
-and permission defaults, constrained by the caller's ceiling. Use that
-inheritance deliberately when the commission leaves the settings open; it
-must not replace an explicit account/model/option/mode selection. Null inherited
-settings on an outside chief do not describe project defaults. A project read
-shows saved defaults, not the effective launch result: prepare the worker idle,
-then verify its configuration and workspace before sending work. This does not
-establish the same inheritance for Scratch.
+Since v0.1.2 an outside launch can inherit a registered project's resolved
+model and permission defaults, constrained by the caller's ceiling. Inherit
+modes only deliberately, and pass the model explicitly for the reason above;
+inheritance must not replace an explicit account/model/option/mode selection.
+Null inherited settings on an outside chief do not describe project defaults.
+A project read shows saved defaults, not the effective launch result: prepare
+the worker idle, then verify its configuration and workspace before sending
+work. This does not establish the same inheritance for Scratch.
 [Default resolution](https://github.com/pingdotgg/t3code/blob/v0.1.2/apps/server/src/mcp/toolkits/project/handlers.ts#L128-L169)
 
 In released v0.1.5, the configuration reader is folded into
@@ -89,30 +101,98 @@ Its read form supplies only the `threadId`; setting
 `modelSelection` is a mutation and needs its own authority. The launch receipt
 also returns `modelSelection`, while `t3_thread_read` supplies workspace and run
 state. `t3_pending_request` combines the older list/read/respond operations.
-A host allowlist naming removed tools can hide these replacements even when
-T3 exposes them. Allowlisting `t3_thread_configure` exposes both read and change,
-not an equivalent read-only replacement. The host owner decides that exposure;
-OAuth and the permission ceiling remain separate. The tool is annotated
-destructive, so a host may require approval even for its read form.
+Exposing `t3_thread_configure` exposes both read and change; there is no
+read-only replacement. The tool is annotated destructive, so a host may
+require approval even for its read form.
 [Read/write branches](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/thread/handlers.ts#L194-L260).
 
-Released v0.1.5 supports optional **launch `clientRequestId`**; supply and retain it
-for a new logical launch. Releases 0.1.0–0.1.2 lack that field. Launch,
-send and interruption retry keys are tied to the authenticated client session;
+### Host tool filters
+
+The host decides which of T3's tools the model sees; the OAuth grant and the
+permission ceiling decide what those tools may do. Choosing one does not set
+the other. A Codex host needs no `enabled_tools` list: without one it exposes
+every tool T3 lists, and where the host loads MCP tools on demand through
+tool search, an unfiltered server adds little context. An `enabled_tools`
+allowlist matches exact names, so it silently hides any tool a T3 release
+renames or merges, along with every new one, such as `t3_environment_links`
+in 0.1.4, until someone edits the list.
+
+A host owner who wants a brake where no approval prompt appears (for example
+Codex with `approval_policy = "never"`) can set a short `disabled_tools`
+denylist of the administration and scheduling tools the chief should not call,
+such as `t3_project_delete`, `t3_environment_unlink` or `schedule_task`. A
+denylist fails open, because a new tool is exposed until it is added, but it
+survives renames of the tools the chief needs. Whether to filter, and how, is
+the host owner's choice; review the choice against each T3 release.
+[Codex tool filter](https://github.com/openai/codex/blob/67f0994b532b8740f14b5b738af7b7b2a915b1d6/codex-rs/codex-mcp/src/tools.rs#L63-L96),
+[deferred exposure](https://github.com/openai/codex/blob/67f0994b532b8740f14b5b738af7b7b2a915b1d6/codex-rs/core/src/mcp_tool_exposure.rs#L156-L160)
+
+Since 0.1.4, launch supports optional **`clientRequestId`** (checked at
+v0.1.6); supply and retain it for a new logical launch. Releases 0.1.0–0.1.3
+lack that field. Launch, send and interruption retry keys are tied to the
+authenticated client session;
 reauthentication can change their namespace. Do not replay changed inputs under
 an old key or assume it survives a new grant: a changed launch payload with
 the same key can replay the first worker without a conflict error. Model
 changes and question responses have no retry key; reconcile them before repeating.
-Wait returns state, not the result, and timeout does not cancel work. Read
-messages/activity and complete needed text pagination. Use the [recovery guide](recovery.md)
+Wait returns state, not the result, and timeout does not cancel work. Pass
+an explicit `timeoutMs` within the host's tool-call limit: without one T3 holds
+a wait for up to 10 minutes, and it accepts at most 60
+([wait bounds](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L125-L126)).
+Read messages/activity and complete needed text pagination. Use the [recovery guide](recovery.md)
 before repeating a possibly accepted operation. [Launch replay](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/project/handlers.ts#L63-L138),
 [OAuth namespace](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/auth/McpOAuth.ts#L564-L575)
 
 A worktree isolates tracked checkout writes, not credentials, services or
 security access. T3 is not a generic filesystem-transfer API. Check source
 access on the execution host and retain valuable editable output at its normal
-owner before relying on workspace cleanup. Ignored files are not necessarily
-protected from that cleanup.
+owner before relying on workspace cleanup.
+
+T3's storage cleanup runs on its own once the environment owner enables an age
+or merge rule in Settings → Storage; the source default removes nothing by age.
+Checked at v0.1.6, an inactivity rule removes a worktree when its threads have
+had no message or run for the configured number of days, settled or not, and a
+separate settled-age rule can remove it sooner. Uncommitted changes, an open
+terminal, a running thread or pending work, and binding by several top-level
+threads keep it. Ignored files keep it only under the "any local files" rule,
+and `node_modules` never does. The branch, its commits and the conversation
+stay; the next message to the thread recreates the worktree from its branch,
+without the ignored files. Keep unique ignored outputs, such as
+session-continuity records or renders, at their owner before a thread goes
+quiet. A reviewer bound to an implementer's worktree as a second top-level
+thread shares its writes and keeps it from ever retiring; give the reviewer a
+new worktree from the implementation branch instead.
+[Cleanup rules](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/storageCleanup.ts#L836-L893),
+[local-change check](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/storageCleanup.ts#L567-L605),
+[defaults](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/settings.ts#L1164-L1173),
+[recreation](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/ProviderTurnStartService.ts#L628-L662)
+
+## Linked environments
+
+Since 0.1.4 an environment can link the user's other machines. The chief
+keeps one connection: `t3_environment_links` lists each linked environment
+with its status, access, `expiresAt` and last error, and tools that take an
+optional `environmentId` send the call there. The linked machine holds the call
+to the link's access, narrowed to the chief's own modes. Checked at v0.1.6:
+
+- A forwarded call cannot carry attachments.
+- Retry keys are scoped to the calling client before they are forwarded, so
+  the launch and send rules above hold across the link.
+- A forwarded wait travels in pieces under a minute, so a long `timeoutMs`
+  survives routes that drop idle requests.
+- A worker that a link started cannot use links itself.
+- While linked environments are off on the connected machine, a call naming
+  another machine fails with `capability_denied`; the user turns them on in
+  Settings → Labs.
+- A link holds a sign-in on the linked machine that lasts 30 days and does
+  not renew. Once it expires, calls fail with a message naming that machine;
+  the user links it again with a new pairing code from it. Expiry is not a
+  reason to substitute another route, machine or account.
+
+[Link tools](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/orchestrator/tools.ts#L308-L348),
+[forwarding](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerForwarding.ts#L94-L212),
+[expiry](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/peer/PeerLinks.ts#L535-L552),
+[sign-in lifetime](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/auth/EnvironmentAuth.ts#L74)
 
 ## Remote access, memory and continuation
 

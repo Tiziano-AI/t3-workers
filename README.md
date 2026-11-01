@@ -14,13 +14,13 @@ the result. T3 runs the workers and retains their conversations. This plugin
 provides one shared skill, connection guidance and an optional quota reader;
 it does not run another server or automatically route work between accounts.
 
-**Alpha.** You need your own T3 environment and a native Codex or Claude Code
-client with plugin support. The operating method uses released outside-agent
-MCP, introduced in **T3 0.1.0**, with discovery and project-default guidance
-for **0.1.2** and current outside-chief guidance for **0.1.5**. The optional
-quota reader accepts exactly **0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 / protocol 2**.
-Versions 0.1.3 and 0.1.4 have not been qualified. Host, provider and recovery paths are not all
-live-qualified. See
+**Alpha.** You need your own T3 environment, **T3 0.1.4 or later**, and a
+native Codex or Claude Code client with plugin support. The operating method
+uses T3's released outside-agent MCP, with current guidance, linked
+environments included, checked at **0.1.6**. The optional quota reader is
+separately exact-version: it accepts **0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 /
+protocol 2**, and not 0.1.3 or 0.1.4. Host, provider and recovery paths are not
+all live-qualified. See
 [architecture and qualification](docs/architecture.md#qualification).
 
 ## Install
@@ -57,7 +57,9 @@ Run `/reload-plugins` where supported, or start a new session.
 
 If the chief already has callable T3 tools, **reuse that connection**. The
 plugin deliberately does not bundle a second MCP registration, a fixed server
-address or credentials.
+address or credentials. One connection is enough for several machines: the
+chief reaches the environments you have linked in T3 by passing their
+`environmentId`.
 
 Otherwise, obtain the outside-agent MCP URL from your T3 environment. The
 loopback example below applies only when the chief and T3 server run on the
@@ -130,8 +132,16 @@ selections are preserved.
   that an idle external chief will wake up.
 - **Results are not automatic memory ingestion.** Reading a worker's answer
   does not import its complete transcript into the chief's learned memory.
-- **Worktrees isolate checkouts, not security.** Retain valuable outputs before
-  relying on checkout cleanup; ignored files are not necessarily protected.
+- **Worktrees isolate checkouts, not security, and they retire.** When your
+  environment's storage cleanup removes inactive worktrees, ignored files go
+  with them (unless it keeps "any local files"); the branch and conversation
+  stay, and the next message recreates the checkout from the branch. Workers
+  keep unique ignored outputs at their owner before their thread goes quiet.
+- **Sign-ins and links expire after 30 days.** Neither the chief's MCP sign-in
+  nor a link between environments renews itself; a person approves again.
+- **Pass the model explicitly.** A launch without `modelSelection` takes the
+  project default and, since T3 0.1.4, can move to a configured fallback
+  account when the default's usage is exhausted.
 - **Permission modes are ceilings, not new authority.** Publishing, spending,
   disclosure and unrelated work still need the user's commission. Human
   security approvals stay human.
