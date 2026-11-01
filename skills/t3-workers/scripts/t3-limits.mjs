@@ -13,12 +13,13 @@ export class LimitsError extends Error {
   }
 }
 
-// Admit exact releases only. 0.1.5 uses an RPC-only ticket route; its bare route also mints media-capable tickets.
+// Admit exact releases only. 0.1.5 and 0.1.6 use an RPC-only ticket route; their bare route also mints media-capable tickets.
 const qualifiedServers = new Map([
   ['0.1.0', { ticketPath: '/api/auth/websocket-ticket' }],
   ['0.1.1', { ticketPath: '/api/auth/websocket-ticket' }],
   ['0.1.2', { ticketPath: '/api/auth/websocket-ticket' }],
   ['0.1.5', { ticketPath: '/api/auth/websocket-ticket/rpc' }],
+  ['0.1.6', { ticketPath: '/api/auth/websocket-ticket/rpc' }],
 ]);
 const qualifiedServerVersions = [...qualifiedServers.keys()];
 const qualifiedText = `${qualifiedServerVersions.join(', ')} on orchestration protocol 2`;

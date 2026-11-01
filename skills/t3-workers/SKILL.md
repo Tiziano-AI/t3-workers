@@ -69,7 +69,7 @@ across providers are not equivalent token budgets, and another thread does not
 create more account capacity.
 
 Use a suitable native structured capacity tool if the connected release
-exposes one. Released T3 **v0.1.5**, like the earlier qualified releases,
+exposes one. Released T3 **v0.1.6**, like the earlier qualified releases,
 has no outside-agent MCP quota tool. This package's optional reader uses native client RPC instead:
 
 ```sh
@@ -81,7 +81,7 @@ Replace the example path with this installed skill's directory. Read
 22.15+ and an explicitly supplied normal T3 read-only session, **not** the MCP
 OAuth credential. Do not issue a session as an unrequested preflight. Default
 to published snapshots; `--refresh` explicitly requests native status probes.
-The reader accepts exactly 0.1.0, 0.1.1, 0.1.2, and 0.1.5/protocol 2 and covers native
+The reader accepts exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2 and covers native
 provider instances, not pooled external usage sources. Use the authenticated
 **Usage → Limits** UI when the reader is unavailable. Keep unknown capacity
 unknown; do not treat it as zero or unlimited, or block an authorized bounded

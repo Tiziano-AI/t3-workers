@@ -5,7 +5,7 @@ explaining what remote access and returned results actually provide. The
 outside-agent baseline below is **released T3 v0.1.0**, with discovery and
 project-default changes checked in **released v0.1.2** and outside-chief
 exposure/recovery checked in **released v0.1.5**. Quota contract support
-is source-checked for 0.1.0, 0.1.1, 0.1.2, and 0.1.5; source support and a live read are separate
+is source-checked for 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6; source support and a live read are separate
 claims. This does not assert that intervening or later contracts are identical. Use the
 connected tool schemas for current syntax and exposure.
 
@@ -35,10 +35,10 @@ exist on another. [Discovery contract](https://github.com/pingdotgg/t3code/blob/
 A configured account label is not verified authenticated identity, and catalog
 presence is not provider health or spare quota.
 
-**Released v0.1.5, like the earlier qualified releases, has no outside-agent MCP quota read.** The bundled
+**Released v0.1.6, like the earlier qualified releases, has no outside-agent MCP quota read.** The bundled
 [quota reader](limits.md) reads T3's native provider snapshots through its
 client RPC with a separately authorized environment session. It accepts exactly
-0.1.0, 0.1.1, 0.1.2, and 0.1.5/protocol 2; this is not a promised stable third-party API.
+0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2; this is not a promised stable third-party API.
 The authenticated **Usage → Limits** UI remains the fallback and can also include
 pooled/external usage sources outside the reader's coverage. Available windows
 depend on the provider/auth path:

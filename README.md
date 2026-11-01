@@ -18,7 +18,7 @@ it does not run another server or automatically route work between accounts.
 client with plugin support. The operating method uses released outside-agent
 MCP, introduced in **T3 0.1.0**, with discovery and project-default guidance
 for **0.1.2** and current outside-chief guidance for **0.1.5**. The optional
-quota reader accepts exactly **0.1.0, 0.1.1, 0.1.2, and 0.1.5 / protocol 2**.
+quota reader accepts exactly **0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 / protocol 2**.
 Versions 0.1.3 and 0.1.4 have not been qualified. Host, provider and recovery paths are not all
 live-qualified. See
 [architecture and qualification](docs/architecture.md#qualification).
@@ -116,10 +116,10 @@ selections are preserved.
 
 ### Limits worth knowing
 
-- **Quota reads are optional and separate from outside-agent MCP in T3 0.1.5 and the earlier qualified releases.** The
+- **Quota reads are optional and separate from outside-agent MCP in T3 0.1.6 and the earlier qualified releases.** The
   bundled [quota reader](skills/t3-workers/references/limits.md) uses T3's native client
   RPC with a separately authorized read-only session. It requires Node.js
-  22.15+ and accepts exactly **T3 0.1.0, 0.1.1, 0.1.2, and 0.1.5 / protocol 2**. It
+  22.15+ and accepts exactly **T3 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 / protocol 2**. It
   reports native account/window snapshots, not an automatic quota router;
   old values can survive a failed refresh. T3's authenticated **Usage → Limits** remains the
   fallback when no reader credential is available. Installing the plugin does

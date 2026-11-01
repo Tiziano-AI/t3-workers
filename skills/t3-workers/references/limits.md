@@ -2,7 +2,7 @@
 
 Use `scripts/t3-limits.mjs` relative to this skill's directory when the chief
 needs structured native-provider allowance. It requires **Node.js 22.15+**,
-T3 **0.1.0, 0.1.1, 0.1.2, or 0.1.5 / orchestration protocol 2**, and a caller-supplied
+T3 **0.1.0, 0.1.1, 0.1.2, 0.1.5 or 0.1.6 / orchestration protocol 2**, and a caller-supplied
 environment bearer session with `orchestration:read`. There are no npm
 dependencies or global installation. Replace the example script path below
 with this installed skill's directory. This is a version-qualified client of T3's first-party
@@ -14,7 +14,10 @@ not that T3 or its quota service is broken. The authenticated configuration is
 checked again: a rejection there occurs after token transmission and returns
 no snapshot. A change between admitted descriptor/config versions or identity
 fails with `ENVIRONMENT_MISMATCH` before any refresh. Releases 0.1.3 and 0.1.4
-remain unqualified; do not bypass the gate or assume a numeric range.
+remain unqualified; do not bypass the gate or assume a numeric range. The
+reader stays exact-version until T3 offers outside agents a supported quota
+read; an [open upstream proposal](https://github.com/pingdotgg/t3code/pull/26439)
+would add usage to `orchestrator_capabilities` behind an environment setting.
 
 The v0.1.2 contract is source-compatible with the earlier admitted releases.
 A real v0.1.2 snapshot read passed on 23 October 2026 without refresh or
@@ -32,13 +35,32 @@ admitted releases use their bare ticket route. A real v0.1.5 snapshot read
 passed on 30 October 2026 without refresh or inference; it establishes
 transport/parsing, not fresh upstream observations or spare capacity.
 [Descriptor](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/environment.ts#L159-L169),
-[ticket routes](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/environmentHttp.ts#L557-L571),
+[ticket routes](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/environmentHttp.ts#L557-L571),
 [ticket audiences](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/auth/EnvironmentAuth.ts#L1192-L1272),
 [RPC handshake](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/ws.ts#L3271-L3297),
 [config/refresh](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/rpc.ts#L623-L647),
 [snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/server.ts#L206-L267),
 [quota fields](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/providerUsageLimits.ts#L13-L49),
 [last-good retention](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/provider-core/src/server/usageLimits.ts#L102-L121).
+
+The v0.1.6 qualification compared each of those sources between the v0.1.5
+and v0.1.6 tags. Ticket routes, quota fields and last-good retention are
+unchanged. The descriptor adds only optional capability flags, and the server
+contract adds an unrelated npm-release read; the configuration and provider
+snapshot shapes are unchanged. `server.refreshProviders` gains an optional
+`reloadSecrets`, which the reader never sends. The ticket response now decodes
+its value as a redacted string, which still travels as the same JSON string.
+Ticket audiences and the RPC handshake keep their checks. The installed
+v0.1.6 server binary carries the same routes and RPC names. On 1 November 2026
+a live v0.1.6 server reported 0.1.6/protocol 2; the reader admitted it before
+authentication and reached the RPC-only ticket route, which rejected a
+placeholder credential with HTTP 401. That establishes admission and route
+selection, not an authenticated v0.1.6 snapshot read, which is a separate check.
+[Descriptor](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/environment.ts#L167-L177),
+[ticket result](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/auth.ts#L240-L243),
+[ticket audiences](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/auth/EnvironmentAuth.ts#L1203-L1283),
+[RPC handshake](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/ws.ts#L3288-L3314),
+[config/refresh](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/rpc.ts#L633-L659).
 
 ## Read the intended environment
 
@@ -139,7 +161,8 @@ snapshot again. A selected instance is validated before refresh; unknown IDs
 are not allowed to turn into an unintended all-provider operation.
 
 Native refresh can launch status-probing runtimes/contact providers without an
-inference prompt. It respects native caches. **Completion is not proof of new
+inference prompt. It respects native caches. The reader never asks T3 to reload
+secret references, which in v0.1.6 can prompt the host to unlock a vault. **Completion is not proof of new
 quota data**: last-good values and their original `checkedAt` can survive a
 failed probe with no newly published failure. `refreshRequested` means only
 that the refresh was requested. A timeout or disconnect does not cancel a

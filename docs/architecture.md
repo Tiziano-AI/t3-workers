@@ -64,20 +64,20 @@ identity reuse remove more user work than they create.
 
 ## A narrow quota seam
 
-T3 0.1.0, 0.1.1, 0.1.2, and 0.1.5 expose provider quota through their first-party client
+T3 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 expose provider quota through their first-party client
 RPC, but not outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
 that read: environment discovery, a native WebSocket ticket, unary Effect RPC, and
 whitelisted account/window output. It has no dependencies beyond Node.js
 22.15+, no provider integrations, no cache and no process that stays alive.
 
 This is a source-visible **native client contract**, not a documented stable
-third-party quota API. The command accepts exactly 0.1.0, 0.1.1, 0.1.2, and 0.1.5, all on
+third-party quota API. The command accepts exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6, all on
 protocol 2, and rejects other descriptor versions before sending a session token. Qualify
 new versions deliberately; do not silently widen the gate. Prefer a suitable
 native quota tool if T3 adds one, then retire this adapter rather than
 maintaining two ways to read the same data.
 
-For v0.1.5 it uses the audience-specific `/api/auth/websocket-ticket/rpc`
+For v0.1.5 and v0.1.6 it uses the audience-specific `/api/auth/websocket-ticket/rpc`
 route, not the broader media-capable bare ticket route. The authenticated
 config must match the descriptor's admitted version and environment before
 refresh. Qualification diagnostics distinguish pre-auth rejection from a
@@ -118,7 +118,7 @@ Primary packaging sources:
 This is an **alpha** with a released T3 0.1.0 outside-agent baseline,
 discovery/project-default guidance for v0.1.2, current outside-chief guidance
 checked at v0.1.5, and a quota reader admitting
-exactly 0.1.0, 0.1.1, 0.1.2, and 0.1.5/protocol 2. Schema/source
+exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2. Schema/source
 checks, catalog fetching, host loading, authentication and successful worker
 execution are separate qualification steps; public availability does not
 establish them all.
@@ -132,7 +132,7 @@ reads requested no refresh or inference. They qualify transport and parsing,
 not fresh provider observations, available allowance, plugin installation or a
 worker cycle. The v0.1.2 quota/snapshot and auth/ticket contracts are
 source-compatible.
-Synthetic tests cover all four admitted versions and rejection of unknown
+Synthetic tests cover every admitted version and rejection of unknown
 versions, incompatible protocols and the wrong environment before credential
 transmission. Source compatibility and these live reads do not establish that
 a chief has loaded this source version.
@@ -143,6 +143,13 @@ RPC-only ticket audience, protocol handshake and config/usage contracts were
 checked separately; their links are in the quota guide. This establishes
 transport and parsing of published native snapshots, not their freshness,
 usable allowance or selection by an installed chief.
+
+On 1 November 2026, v0.1.6 was qualified by comparing the reader's tagged
+sources with v0.1.5, checking the installed v0.1.6 server binary and reading a
+live v0.1.6 descriptor: the reader admitted it before authentication and
+reached the RPC-only ticket route, which refused a placeholder credential.
+No authenticated v0.1.6 snapshot read was part of that check. The quota guide
+records the compared sources.
 
 An independent read-only v0.1.2 acceptance check exercised live discovery,
 model search and recovery of an existing worker's configuration and state.
