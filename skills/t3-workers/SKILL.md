@@ -20,8 +20,9 @@ Do not create a permanent T3 coordinator or one endless thread per provider.
 
 For an existing worker, recover its identity and state before launching
 anything. For a new commission, follow the idle-first sequence below. Before
-retrying a lost response, changing an active assignment, or handing work back
-unfinished, read [Recovery and continuity](references/recovery.md).
+retrying a lost response, changing an active assignment, changing how a worker
+reaches required sources, or handing work back unfinished, read
+[Recovery and continuity](references/recovery.md).
 
 If tools are missing, a sign-in or link nears its 30-day expiry, or the user
 requests connection/setup, read [Connect the chief](references/setup.md). For
@@ -126,8 +127,9 @@ the result; retain integration and consequential choices in this chief.
 
 Resolve a registered project with `t3_project_list`/`t3_project_read`, including
 pagination when needed. A project's saved defaults can inform settings the
-commission leaves open: pass the resulting `modelSelection` explicitly, and let
-modes inherit only deliberately, within the caller's ceiling. Null inherited
+commission leaves open: pass the resulting `modelSelection` and `runtimeMode`
+explicitly, and let the interaction mode inherit only deliberately, within the
+caller's ceiling. Null inherited
 settings on an outside chief are not those defaults, and `t3_project_read`
 shows saved defaults, not the launch's effective configuration. Preserve any
 explicit account, model, option, or mode selection and verify the prepared
@@ -165,17 +167,29 @@ account is admitted for. T3 MCP is not a generic filesystem/file
 transfer surface: a call forwarded to a linked environment cannot carry
 attachments (checked at v0.1.6), so put needed material where that machine can
 read it and name the location in the brief. A worker started over a link
-cannot use links itself; do not brief it to reach a third machine. Full
-access is an execution ceiling, not authority to spend, publish, share private
-data, or make unrelated changes. Pick a supported runtime mode within both the
-grant and the commission's actual authority.
+cannot use links itself; do not brief it to reach a third machine.
+
+**Choose `runtimeMode` for each launch and pass it.** The values are
+`approval-required`, `auto-accept-edits`, `auto` and `full-access` (checked at
+v0.1.6). `orchestrator_capabilities` reports this connection's ceiling as
+`runtimeMode` and, for a provider that offers only some modes, its
+`runtimeModes`. Omitted on an outside launch, the mode is the project's
+default clamped to the ceiling, and it steps down silently to a narrower mode
+the provider offers when the provider lacks it; an explicit mode the provider lacks is refused, and one above the
+ceiling fails with `runtime_mode_escalation_denied`. Derive the mode from the
+commission's permitted effects and the selected provider's behavior, described
+in [Capability boundaries](references/capabilities.md#runtime-modes-and-approvals);
+neither Full access nor an always-ask mode is the default. Full access is an
+execution ceiling, not authority to spend, publish, share private data, or make
+unrelated changes. A mode that asks holds the worker until a person answers in
+T3, so tell the user when a worker runs in a mode that may ask them.
 
 ## Launch idle, verify, then send
 
 1. Create a uniquely titled worker with `t3_thread_launch`, **omitting the
    initial message and attachments**. Pass `environmentId` for a linked
-   machine, the explicit `modelSelection`, the commissioned modes and the
-   deliberate workspace binding. Keep its `threadId`, returned
+   machine, the explicit `modelSelection` and `runtimeMode`, any commissioned
+   interaction mode and the deliberate workspace binding. Keep its `threadId`, returned
    `modelSelection`, and preparation state. Supply launch `clientRequestId`
    (since 0.1.4, checked at v0.1.6) as a new key for each logical launch and
    retain it. Reuse it only for an identical retry under the same sign-in:
@@ -185,7 +199,7 @@ grant and the commission's actual authority.
 2. Read the prepared thread with `t3_thread_read`. Confirm the provider
    instance, effective model, runtime/interaction modes, project, and workspace
    binding; compare the launch's returned `modelSelection`, including options,
-   with the commission. The configuration read is part of
+   with the commission, and the thread's `runtimeMode` with the one you passed. The configuration read is part of
    `t3_thread_configure` (checked at v0.1.6); pass only `{threadId}` for a read, never
    `modelSelection` as a readback. Exposing this consolidated tool also exposes
    model changes; the host owner must authorize that exposure separately from
@@ -205,10 +219,13 @@ grant and the commission's actual authority.
 4. Follow the specific run with `t3_thread_wait`, passing its `runId` and an
    explicit `timeoutMs` within this host's tool-call limit. Without one, T3
    holds the wait for up to 10 minutes (it caps any longer value at 60), and a host that
-   gives up first reports a failed call while the wait continues. Then read messages and
-   relevant activity. A timeout leaves the work running. A terminal run can have
-   failed or produced only part of the requested result; a completed turn is not
-   necessarily a completed commission.
+   gives up first reports a failed call while the wait continues. Then read
+   messages and relevant activity. This wait settles only on a terminal run: it does not return early for a question or
+   an approval. After any nonterminal result (`timedOut: true`, or a status
+   that is not terminal), read the thread for pending requests as described
+   below before waiting again. A timeout leaves the work running. A terminal
+   run can have failed or produced only part of the requested result; a
+   completed turn is not necessarily a completed commission.
 
 Use `t3_thread_send` modes intentionally: `queue` requests a separate follow-up
 turn, `steer` changes an active turn, and `restart` interrupts and restarts it.
@@ -224,16 +241,31 @@ logical message its own request key.
   `textOffset = nextTextOffset` until that offset is null; offsets are UTF-16
   code units. Activity can explain blocked tools, partial effects, or failure
   that the messages view omits.
-- Inspect questions using only tools actually exposed by this connection.
-  The older `t3_pending_request_*` tools are combined into
-  `t3_pending_request` (checked at v0.1.6) with `action: "list"`, `"read"`,
-  or `"respond"`; pass the target thread explicitly. Respond has no retry key: reconcile the pending
-  request after a lost reply before answering again. When no question
-  interface is exposed, use the thread activity and ask the user to inspect
-  the exact worker in T3. Answer supported question tools only within this
-  chief's delegated authority; bring user-owned choices to the user. A question
-  response **cannot approve a security/permission request**. Leave that
-  decision to the user in T3's supported interface.
+- **Look for pending requests after every nonterminal wait.** Read the worker
+  with `t3_thread_read` and check `pendingRequestCount` together with its
+  recent activity. That count covers every pending runtime request: approvals
+  as well as questions and other kinds. `t3_pending_request` with
+  `action: "list"` returns **questions only**. Do not subtract one number from
+  the other to count approvals, and do not infer that no approval is pending
+  from a `running` or `waiting` status. The activity view shows an approval as
+  an `approval_request` item with the requested action (checked at v0.1.6).
+- **Questions**: `t3_pending_request` (checked at v0.1.6) combines the older
+  `t3_pending_request_*` tools with `action: "list"`, `"read"`, or
+  `"respond"`; pass the target thread explicitly. Respond has no retry key:
+  reconcile the pending request after a lost reply before answering again.
+  Answer only within this chief's delegated authority; bring user-owned
+  choices to the user. When no question interface is exposed, use the thread
+  activity and ask the user to inspect the exact worker in T3.
+- **Approvals belong to a person in T3.** T3's MCP tools offer no way to grant
+  one (checked at v0.1.6), and a question response **cannot approve a security/permission
+  request**. Tell the user now, with the worker's `link`, the exact action it
+  asks to take, and what in the commission waits on the answer. Do not cancel,
+  restart or relaunch the worker in a broader mode, or narrow its commission,
+  merely to make the request go away. A declined request stands; see
+  [Recovery and continuity](references/recovery.md#when-a-route-is-blocked)
+  for what may change after it. The `pendingApproval` field and early return
+  of a `delegate_task` wait belong to an internal T3 parent thread; an outside
+  chief's `t3_thread_wait` has neither.
 - Continue the same worker when its history matters; give it a focused
   follow-up and follow the resulting run. Use a new worker for a genuinely
   independent commission, not as a quota or permission workaround.
@@ -243,6 +275,9 @@ logical message its own request key.
   with their real project/deliverable owner and enough source locators to
   recover them; confirm that unique ignored outputs left the worktree before the
   worker goes quiet. A worker asking for an effect does not authorize that effect.
+  When a route to required sources is blocked, an authorized equivalent route
+  keeps the owed coverage; anything narrower leaves that component owed in the
+  rebrief and the report (see [recovery](references/recovery.md#when-a-route-is-blocked)).
 
 Keep thread/project/run IDs and pending effects in the existing conversation
 or normal work owner, not a new fleet registry or transcript archive. T3 retains
@@ -271,6 +306,13 @@ launch model fallback and worktree cleanup are checked against released v0.1.6:
 [calling-thread tools](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/McpInvocationContext.ts#L193-L206),
 [launch model resolution](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/project/handlers.ts#L168-L206)
 and [cleanup rules](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/storageCleanup.ts#L836-L893).
+Runtime modes and request observation are checked against released v0.1.6:
+[mode values](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/providerPolicy.ts#L25-L45),
+[mode resolution](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/delegatedTaskModes.ts#L36-L73),
+[launch modes](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/project/handlers.ts#L207-L229),
+[pending count](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L848-L850),
+[question list](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/thread/handlers.ts#L224-L235)
+and [wait settlement](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/ThreadManagementService.ts#L928-L936).
 See [Quota reader](references/limits.md)
 for version qualification, separate sessions, and freshness.
 Use current callable schemas for syntax and newly supported capabilities;

@@ -5,8 +5,9 @@ explaining what remote access and returned results actually provide. The
 outside-agent baseline below is **released T3 v0.1.0**, with discovery and
 project-default changes checked in **released v0.1.2** and outside-chief
 exposure/recovery checked in **released v0.1.5**. The method requires **T3
-0.1.4 or later**; linked environments, launch model resolution and worktree
-cleanup are checked in **released v0.1.6**. Quota contract support is
+0.1.4 or later**; linked environments, launch model resolution, worktree
+cleanup, runtime modes and request observation are checked in **released
+v0.1.6**. Quota contract support is
 source-checked for 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6; source support and a
 live read are separate claims. This does not assert that intervening or later
 contracts are identical. Use the connected tool schemas for current syntax and
@@ -86,9 +87,11 @@ and deliberate root/worktree strategy; project root is not the chief's working
 directory. [Launch contract](https://github.com/pingdotgg/t3code/blob/v0.1.0/apps/server/src/mcp/toolkits/project/tools.ts#L104-L140)
 
 Since v0.1.2 an outside launch can inherit a registered project's resolved
-model and permission defaults, constrained by the caller's ceiling. Inherit
-modes only deliberately, and pass the model explicitly for the reason above;
-inheritance must not replace an explicit account/model/option/mode selection.
+model and permission defaults, constrained by the caller's ceiling. Pass the
+model and the runtime mode explicitly, for the reasons above and in
+[Runtime modes and approvals](#runtime-modes-and-approvals); inherit the
+interaction mode only deliberately. Inheritance must not replace an explicit
+account/model/option/mode selection.
 Null inherited settings on an outside chief do not describe project defaults.
 A project read shows saved defaults, not the effective launch result: prepare
 the worker idle, then verify its configuration and workspace before sending
@@ -105,6 +108,85 @@ Exposing `t3_thread_configure` exposes both read and change; there is no
 read-only replacement. The tool is annotated destructive, so a host may
 require approval even for its read form.
 [Read/write branches](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/mcp/toolkits/thread/handlers.ts#L194-L260).
+
+### Runtime modes and approvals
+
+A launch's `runtimeMode` is one of `approval-required`, `auto-accept-edits`,
+`auto` and `full-access`, ranked in that order. Checked at v0.1.6, T3 resolves
+it in two steps. First against this connection's ceiling: an explicit mode
+above it fails with `runtime_mode_escalation_denied`, and an omitted one
+becomes the project's default runtime mode, or the ceiling when that default
+is broader. Then against the provider: an explicit mode the provider does not
+offer is refused, while an omitted one steps down to the broadest mode the
+provider offers that is no broader than the mode already resolved, or to
+`approval-required` when it offers none of those; it never rises above the
+ceiling. `orchestrator_capabilities` lists a provider's `runtimeModes` only
+when it offers a subset. The thread then reports the mode it runs in.
+[Mode values](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/providerPolicy.ts#L25-L45),
+[resolution](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/delegatedTaskModes.ts#L36-L73),
+[ceiling](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/McpToolAccess.ts#L231-L249),
+[project default](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/project/handlers.ts#L207-L229),
+[advertised modes](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L2199-L2202)
+
+The same mode means different things to different providers. The table
+records what each released v0.1.6 adapter does with it when the runtime policy
+carries no explicit approval or sandbox override; such an override replaces
+these mappings, and this method does not establish when one is set. It is a
+reading of T3's adapters, not a guarantee about each provider's own reviewer.
+
+| Mode | Codex | Claude | Grok | Cursor |
+| --- | --- | --- | --- | --- |
+| `approval-required` | Read-only sandbox, approval policy `untrusted`; the user reviews | Permission mode `default` with T3's permission callback installed; requests Claude routes to the callback can become T3 approvals | Reads run; other tool permissions ask in T3 | Cursor's own auto-review gates execution, sandbox on |
+| `auto-accept-edits` | Workspace-write sandbox, `on-request`; the user reviews | `acceptEdits` with the callback installed; Claude approves edits before the callback, and the remaining requests it routes there can become T3 approvals | Edits, deletes and moves run; other non-read permissions ask in T3 | Sandbox on, no auto-review |
+| `auto` | Workspace-write sandbox, `on-request`; Codex's automatic reviewer reviews | Claude's `auto` mode; T3 installs no permission callback | Grok's own auto mode; any permission request reaching T3 asks the user | Cursor's own auto-review, sandbox on |
+| `full-access` | Approval policy `never`, unrestricted sandbox | `bypassPermissions`; when the user's Claude settings disable bypass, `auto` (or `default` if auto is disabled too) with T3's permission callback installed | Permission requests are allowed | No sandbox, no auto-review |
+
+Provider differences that change how a chief reads a worker:
+
+- Claude in Plan interaction mode runs in permission mode `plan` with T3's
+  permission callback installed, even in `auto` or `full-access`.
+- A Claude worker launched in `full-access` gets the permission callback, and
+  so can raise approvals, when the user's Claude settings disable bypass
+  permissions.
+- Cursor has no interactive approval request in T3: its adapter declares no
+  approval support and rejects approval responses. A refusal by Cursor's
+  auto-review appears in the worker's activity or result, never in
+  `pendingRequestCount`, and there is no card in T3 for the user to answer.
+  On Windows, Cursor runs without a filesystem sandbox where auto-review
+  gates execution.
+- Unknown from this source: when Codex's automatic reviewer escalates to the
+  user, what Cursor's auto-review allows, and how Grok's native modes behave
+  beyond T3's permission gate. Observe the worker rather than assuming.
+
+[Codex mapping](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts#L698-L737),
+[Claude mapping](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts#L2488-L2599),
+[Grok launch mode](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/provider-grok/src/server/adapter.ts#L213-L220),
+[Grok permission routing](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/provider-grok/src/server/adapter.ts#L298-L302),
+[ACP permission rules](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/provider-acp/src/server/clientPolicy.ts#L75-L181),
+[Cursor policy](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/provider-cursor/src/server/adapter.ts#L186-L199),
+[Cursor approvals](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/provider-cursor/src/server/adapter.ts#L119-L126),
+[Cursor responses](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/provider-cursor/src/server/adapter.ts#L2709-L2717)
+
+**Observing a held worker from outside.** A top-level `t3_thread_wait`
+settles only when its run is terminal; a run held on a question or an approval
+keeps it waiting until `timeoutMs`. `t3_thread_read` reports
+`pendingRequestCount`, which counts every pending runtime request: the
+approval kinds (`command`, `file-read`, `file-change`, `mcp-elicitation`,
+`permission`) and also `user_input`, `dynamic_tool_call` and `auth_refresh`.
+`t3_pending_request` lists only `user_input` questions, so the difference
+between the two numbers is not an approval count. The activity view renders
+each approval as an `approval_request` item with its prompt, kind and reason.
+No outside-agent MCP tool grants an approval; the person answers in T3. The
+`pendingApproval` field, and the wait that returns early on it, belong to
+`delegate_task`, which serves an internal T3 parent thread and answers an
+outside chief with `thread_credential_required`.
+[Request kinds](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/orchestrationV2.ts#L1199-L1209),
+[pending count](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L848-L850),
+[question list](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/thread/handlers.ts#L224-L235),
+[question tool](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/thread/tools.ts#L127-L131),
+[approval activity](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L914-L917),
+[wait settlement](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/ThreadManagementService.ts#L928-L936),
+[internal pendingApproval](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L479-L523)
 
 ### Host tool filters
 

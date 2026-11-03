@@ -33,7 +33,19 @@ within the link's access and the chief's modes. The plugin adds no
 per-machine registration, relay or alternative route, and an expired link is
 renewed by a person rather than worked around. A launch always carries an
 explicit `modelSelection`, because an omitted one can move to a configured
-fallback account when the default's usage is exhausted.
+fallback account when the default's usage is exhausted, and an explicit
+`runtimeMode`, because an omitted one takes the project default and can step
+down silently for the provider. No runtime mode is a universal default.
+
+Approvals stay with the person in T3. An outside chief's wait settles only on
+a terminal run, so after a nonterminal wait the chief reads the thread's
+pending-request count and activity. The count includes approvals, unlike the
+question list; activity identifies the requested action before the chief
+brings a pending approval to the user. The
+plugin adds no approval relay; `delegate_task`'s `pendingApproval` serves an
+internal T3 parent, not this chief. Providers map the same mode differently,
+and Cursor raises no T3 approval at all; the capability reference records the
+v0.1.6 mappings and their unknowns.
 
 The native v0.1.2 thread CLI serves local scripts, but lacks controls needed by
 this cycle, including idle-first launch, model options and caller-supplied
@@ -130,7 +142,8 @@ Primary packaging sources:
 This is an **alpha** that requires T3 0.1.4 or later, with a released T3
 0.1.0 outside-agent baseline, discovery/project-default guidance for v0.1.2,
 outside-chief exposure and recovery checked at v0.1.5, linked environments,
-launch model resolution and worktree cleanup checked at v0.1.6, and a quota
+launch model resolution, worktree cleanup, runtime modes and request
+observation checked at v0.1.6, and a quota
 reader admitting
 exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2. Schema/source
 checks, catalog fetching, host loading, authentication and successful worker
@@ -171,6 +184,19 @@ Explicit-selection and deliberate project-default launch inputs were prepared
 but not submitted; neither a new worker cycle nor resolved default inheritance
 was demonstrated by that check.
 
+On 3 November 2026, runtime-mode resolution, pending-request counting, the
+question list, wait settlement and the Codex, Claude, Grok and Cursor mode
+mappings were read in tagged v0.1.6 source. A separate scoped live check with
+a Codex worker in Scratch then exercised approval discovery: the idle worker's
+explicit `approval-required` mode was verified before a harmless text-file
+write, its wait returned nonterminal, and it reported one pending request
+while the question list was empty. Activity identified an `approval_request`
+for that write even though the thread status was `running`. The outside chief
+reported the worker link, action and dependent work, leaving the decision to
+the person in T3. This qualifies discovery and reporting for that Codex path,
+not the approval outcome, other providers, source-coverage continuity or the
+chief's judgment in future work.
+
 Use the publisher catalog's native installation path to check delivery of this
 package. Isolated package acceptance establishes that the client can install
 its resources, not selection or use in an interactive chief. Do not infer a
@@ -182,13 +208,14 @@ explicitly scoped environment:
 | Check | Required observation |
 | --- | --- |
 | Package loading | Native installation exposes the skill and its references in the intended chief; no duplicate MCP registration. |
-| Worker cycle | An idle worker has the selected account/model/options/workspace, then completes a useful bounded assignment and follow-up; the same thread is visible in T3. Repeat for each claimed provider path. |
+| Worker cycle | An idle worker has the selected account/model/options/runtime mode/workspace, then completes a useful bounded assignment and follow-up; the same thread is visible in T3. Repeat for each claimed provider path. |
 | Result retrieval | Needed long text and retained artifacts are actually read, not inferred from terminal status. |
 | Recovery | Rediscover by unique title without the launch receipt, repeat an identical keyed launch that returns the same `threadId`, and reconcile/repeat an identical harmless send without an extra turn. |
 | Linked environment | Discover a linked machine, launch, follow and read a worker there by `environmentId`, and observe an expired link fail with a re-link instruction rather than a fallback. |
 | Retention | A worker keeps its unique ignored outputs at their owner before going quiet; after cleanup retires its worktree, the next message recreates it from the branch. |
 | Stop | Interrupt genuinely active work and inspect terminal state and surviving effects. |
-| Human approval | A separate supervised harmless write leaves the approval decision with the user in T3. |
+| Human approval | In a supervised harmless write under a mode that asks, the outside chief's wait returns without a terminal run, `pendingRequestCount` is nonzero while the question list is empty, and the chief reports the worker's link, the requested action and what waits on it; the decision stays with the user in T3, and the chief neither answers it nor cancels or narrows the work to remove it. Repeat for each claimed provider; for Cursor, observe how a refusal appears instead. |
+| Source coverage | When a worker's route to required sources is blocked, the result either reaches the same coverage through an authorized equivalent route, reported as such, or carries the narrowed component as still owed through the rebrief, any handoff and the report to the user. |
 | Continuity | A returning chief recovers an existing worker without relaunching. If remote use is claimed, exercise that same chief through the actual remote client. |
 | Package lifecycle | Update loads the new version; disable/uninstall removes the skill without cancelling workers, deleting data or silently revoking another connection. |
 

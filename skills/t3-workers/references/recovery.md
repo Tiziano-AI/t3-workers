@@ -42,10 +42,41 @@ session; they do not apply to the native `t3 thread` CLI.
 | Native CLI start/send response was lost | Recover the thread and read its timeline/run state before another command. `start` may already have created the worker; `send` always queues and offers no caller-supplied retry key. Repeating it can create another turn. |
 | Wait timed out or the chief went away | Read/wait on the existing run with an explicit `timeoutMs` within the host's tool-call limit; a host-side timeout is as uncertain as T3's. A timeout neither cancels the run nor authorizes resending its brief. Avoid repeatedly reading unchanged full transcripts; retain the relevant cursor. |
 | A linked machine's call failed | Read `t3_environment_links`. If the link expired, the worker's thread stays on that machine: the user links the machine again with a new pairing code from it, then recover the worker by its IDs, or by unique title there, with the same `environmentId`. The new link is a new sign-in on that machine, so a launch or send key used before it need not deduplicate after it. Do not relaunch the assignment on another machine, account or route. If the link is only unreachable, retry the read later rather than repeating an effect. |
-| Run is waiting | Inspect activity and pending questions. A zero question count does not rule out a human security approval. Use the supported human interface for permissions. |
+| Wait returned without a terminal run | Read the thread's `pendingRequestCount` and recent activity before waiting again. The count includes approvals; `t3_pending_request` lists only questions, so an empty list or a `running`/`waiting` status does not rule out an approval. Bring a pending approval to the user with the worker's `link`, the requested action and what waits on it; the person answers it in T3. A Cursor worker raises no T3 approval: look for refusals in its activity instead. |
 | Provider failed, account is exhausted, or quota is unknown | Preserve any result and report the precise gap. Do not change account/model, consume a reset, reauthenticate, or launch a replacement without the necessary authority. Distinguish observed failure from stale or unavailable capacity information. |
 | Worker says it is done | Read the complete needed result, check the requested output and known effects. Terminal status alone does not establish a successful commission or artifact delivery. |
 | A worker's worktree is gone | T3's storage cleanup may have retired it after inactivity. The branch, commits and conversation remain, and the next message recreates the worktree from the branch without its ignored files. Recover what the branch holds; outputs that lived only in ignored files are gone unless they were kept elsewhere. |
+
+## When a route is blocked
+
+A pending or declined approval, a refused tool, a missing integration or an
+exhausted account can block the way a worker was to reach part of its result.
+Before changing that way, name the component the commission owes, such as
+exploration of a named source set, a check, or an independent review, and
+decide which of two different changes you are making.
+
+- **An equivalent alternative** reaches the same component with the same
+  coverage, through a route already within authority. For example, when a
+  worker's reads of required files are held and the complete primary material
+  is already admitted to this commission, giving the worker that complete
+  material another way (placed where it can read it, or supplied whole)
+  changes only the reading mechanism. Coverage is preserved and no human
+  escalation is needed for the change. Say in the report which route changed.
+  A request still pending in T3 remains the user's; the alternative does not
+  answer it.
+- **A narrowed result** delivers less: chief-selected excerpts, summaries or
+  conclusions in place of the worker's own exploration of the required
+  sources, a subset of them, or a skipped check. That is not the owed
+  component, and disclosing the substitution does not complete it. Keep the
+  component owed: say in the rebrief what the worker received instead and
+  which of its findings depend on the gap; carry the gap in any handoff; and
+  report it to the user as open, with what would complete it.
+  Only actual coverage or a change in the user's commission closes that gap.
+
+An explicit refusal, such as a declined approval or the user's no, closes that
+route. Do not reach the same effect by another route; report what it blocks.
+In either case keep partial results that are useful, labeled with what they
+cover.
 
 ## Interrupt a real run
 
@@ -68,7 +99,8 @@ an interruption acknowledgement.
 ## Return and handoff
 
 On the chief's return, recover the existing worker and inspect what happened
-since the last known position. Do not relaunch its assignment. Continue with a
+since the last known position, including `pendingRequestCount`. Do not
+relaunch its assignment. Continue with a
 new logical message only when the current task requires it, preserving any
 unanswered human decision.
 
@@ -79,8 +111,9 @@ cleanup can retire an inactive worktree with its ignored files.
 
 When leaving a worker running, tell the user what it is doing, its current
 observed state, how its result will be recovered, and how to stop it. Record
-the exact IDs, cursor, request keys relevant to uncertain effects, and pending
-decision at the existing work owner when later continuation needs them. Keep
+the exact IDs, cursor, request keys relevant to uncertain effects, pending
+decision and any component still owed after a narrowed route at the existing
+work owner when later continuation needs them. Keep
 this compact; T3 owns the transcript. Do not promise automatic wake-up or
 delivery into an idle external chief unless that separate path was actually
 established.
