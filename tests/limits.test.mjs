@@ -6,7 +6,7 @@ import { formatText, main, normalizeConfig, parseToken, readLimits, validateUrl 
 // Synthetic released-protocol shapes, not captures or proof of live providers.
 const TOKEN = 'test-session-secret';
 const stamp = '2026-10-18T12:00:00.000Z';
-const descriptor = { environmentId: 'environment-one', label: 'Test environment', serverVersion: '0.1.0', orchestrationProtocolVersion: 2 };
+const descriptor = { environmentId: 'environment-one', label: 'Test environment', serverVersion: '0.1.7', orchestrationProtocolVersion: 2 };
 const provider = () => ({
   instanceId: 'codex-one', driver: 'codex', displayName: 'Test account', enabled: true, installed: true,
   version: '1.0', status: 'ready', availability: 'available', checkedAt: stamp,
@@ -19,7 +19,7 @@ const provider = () => ({
   },
   models: [{ secret: TOKEN }], runtimePaths: { home: '/private/home' }, config: { token: TOKEN },
 });
-const config = (serverVersion = '0.1.0') => ({ environment: { ...descriptor, serverVersion }, providers: [provider()], externalUsage: [{ token: TOKEN }], skills: [{ secret: TOKEN }] });
+const config = (serverVersion = descriptor.serverVersion) => ({ environment: { ...descriptor, serverVersion }, providers: [provider()], externalUsage: [{ token: TOKEN }], skills: [{ secret: TOKEN }] });
 
 function harness({ getConfig = config, reply, ticketStatus = 200, discovery = descriptor, hang = false, failConnect = false, ticketHang = false } = {}) {
   const http = [], requests = [], sockets = [];
@@ -83,11 +83,12 @@ test('invalid percentages, protocol drift, and missing selected instance are mea
     assert.throws(() => normalizeConfig(native), { code: 'INCOMPATIBLE_RESPONSE' });
   }
   const drift = config(); drift.environment.orchestrationProtocolVersion = 3;
-  assert.throws(() => normalizeConfig(drift), { code: 'UNQUALIFIED_SERVER' });
+  assert.throws(() => normalizeConfig(drift), { code: 'UNSUPPORTED_PROTOCOL' });
   assert.throws(() => normalizeConfig(config(), { instanceId: 'missing' }), { code: 'INSTANCE_NOT_FOUND' });
 });
 
-for (const serverVersion of ['0.1.0', '0.1.1', '0.1.2', '0.1.5', '0.1.6']) test(`T3 ${serverVersion} snapshot discovers unauthenticated identity before ticket and uses native Effect requests`, async () => {
+// Versions are synthetic identity values here: capability is exercised, not inferred from semver.
+for (const serverVersion of ['0.1.7', '0.2.0', '99.12.34+build.1', 'nightly-contract-fixture']) test(`protocol-2 snapshot admits ${serverVersion} with the same contract and uses only RPC tickets`, async () => {
   const h = harness({ discovery: { ...descriptor, serverVersion }, getConfig: () => config(serverVersion) });
   const result = await readLimits({ ...h.options, environmentId: descriptor.environmentId });
   assert.equal(result.schemaVersion, 1);
@@ -96,8 +97,7 @@ for (const serverVersion of ['0.1.0', '0.1.1', '0.1.2', '0.1.5', '0.1.6']) test(
   assert.equal(h.http[0].options.headers, undefined);
   assert.equal(h.http[1].options.headers.Authorization, `Bearer ${TOKEN}`);
   assert.equal(h.http[1].options.method, 'POST');
-  assert.equal(new URL(h.http[1].url).pathname, ['0.1.5', '0.1.6'].includes(serverVersion)
-    ? '/api/auth/websocket-ticket/rpc' : '/api/auth/websocket-ticket');
+  assert.equal(new URL(h.http[1].url).pathname, '/api/auth/websocket-ticket/rpc');
   assert.ok(h.http.every(call => call.options.redirect === 'error'));
   assert.deepEqual(h.requests, [{ _tag: 'Request', id: '1', tag: 'server.getConfig', payload: {}, headers: [] }]);
   const wsUrl = new URL(h.sockets[0].url);
@@ -153,18 +153,38 @@ test('omitting an instance deliberately permits an all-provider refresh', async 
   assert.deepEqual(h.requests[1], { _tag: 'Request', id: '2', tag: 'server.refreshProviders', payload: {}, headers: [] });
 });
 
-test('unqualified or wrong environment descriptor prevents bearer transmission', async () => {
-  for (const discovery of [
-    ...['0.1.3', '0.1.4', '0.1.7', '0.2.0', '0.1.5-nightly.1', '0.1.6-nightly.1', undefined].map(serverVersion => ({ ...descriptor, serverVersion })),
-    ...[1, 3, undefined].map(orchestrationProtocolVersion => ({ ...descriptor, orchestrationProtocolVersion })),
-    { ...descriptor, serverVersion: '0.1.2', orchestrationProtocolVersion: 3 },
-  ]) {
+test('unsupported protocol in discovery prevents bearer transmission', async () => {
+  for (const orchestrationProtocolVersion of [1, 3, '2', undefined, null]) {
+    const discovery = { ...descriptor, orchestrationProtocolVersion };
     const h = harness({ discovery });
-    await assert.rejects(readLimits(h.options), { code: 'UNQUALIFIED_SERVER' });
+    await assert.rejects(readLimits(h.options), error => {
+      assert.equal(error.code, 'UNSUPPORTED_PROTOCOL');
+      assert.equal(error.details.supportedOrchestrationProtocolVersion, 2);
+      assert.equal(error.details.tokenSent, false);
+      return true;
+    });
     assert.equal(h.http.length, 1);
     assert.equal(h.http[0].options.headers, undefined);
     assert.equal(h.sockets.length, 0);
   }
+});
+
+test('malformed discovery identity prevents bearer transmission', async () => {
+  for (const discovery of [
+    null, [], {},
+    ...[undefined, null, '', ' \t\n', 7].flatMap(value => [
+      { ...descriptor, environmentId: value }, { ...descriptor, serverVersion: value },
+    ]),
+  ]) {
+    const h = harness({ discovery });
+    await assert.rejects(readLimits(h.options), error => error.code === 'INCOMPATIBLE_RESPONSE' && error.details.tokenSent === false);
+    assert.equal(h.http.length, 1);
+    assert.equal(h.http[0].options.headers, undefined);
+    assert.equal(h.sockets.length, 0);
+  }
+});
+
+test('wrong requested environment prevents bearer transmission', async () => {
   const h = harness();
   await assert.rejects(readLimits({ ...h.options, environmentId: 'another-environment' }), { code: 'ENVIRONMENT_MISMATCH' });
   assert.equal(h.http.length, 1);
@@ -172,14 +192,15 @@ test('unqualified or wrong environment descriptor prevents bearer transmission',
   assert.equal(h.sockets.length, 0);
 });
 
-test('getConfig must agree with pre-auth discovery', async () => {
+test('getConfig must agree with pre-auth discovery before refresh', async () => {
   const h = harness({ getConfig: () => ({ ...config(), environment: { ...descriptor, environmentId: 'changed' } }) });
-  await assert.rejects(readLimits(h.options), { code: 'ENVIRONMENT_MISMATCH' });
+  await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'ENVIRONMENT_MISMATCH' });
+  assert.deepEqual(h.requests.map(request => request.tag), ['server.getConfig']);
   assert.equal(h.sockets[0].closed, true);
 });
 
-test('an admitted config version cannot change after discovery, even before refresh', async () => {
-  for (const [initial, later] of [['0.1.2', '0.1.5'], ['0.1.5', '0.1.2'], ['0.1.5', '0.1.6'], ['0.1.6', '0.1.5']]) {
+test('config version cannot change after discovery, even when both versions use the supported contract', async () => {
+  for (const [initial, later] of [['0.1.7', '0.2.0'], ['0.2.0', '0.1.7'], ['nightly-contract-fixture', 'another-contract-fixture']]) {
     const h = harness({ discovery: { ...descriptor, serverVersion: initial }, getConfig: () => config(later) });
     await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'ENVIRONMENT_MISMATCH' });
     assert.deepEqual(h.requests.map(r => r.tag), ['server.getConfig']);
@@ -187,11 +208,11 @@ test('an admitted config version cannot change after discovery, even before refr
   }
 });
 
-test('qualification errors distinguish pre-auth admission from authenticated config without leaking versions', async () => {
+test('protocol errors distinguish pre-auth rejection from authenticated config without leaking versions', async () => {
   for (const tokenSent of [false, true]) {
     for (const serverVersion of ['0.1.7', `0.1.7-${TOKEN}`, `Bearer ${TOKEN}`, '0.1.7?wsTicket=private-ticket']) {
       for (const json of [false, true]) {
-        const bad = { ...descriptor, serverVersion };
+        const bad = { ...descriptor, serverVersion, orchestrationProtocolVersion: 3 };
         const h = harness(tokenSent
           ? { getConfig: () => ({ ...config(), environment: bad }) }
           : { discovery: bad });
@@ -206,10 +227,12 @@ test('qualification errors distinguish pre-auth admission from authenticated con
         assert.ok(!output.includes('private-ticket'));
         if (json) {
           const error = JSON.parse(output).error;
-          assert.equal(error.code, 'UNQUALIFIED_SERVER');
+          assert.equal(error.code, 'UNSUPPORTED_PROTOCOL');
           assert.equal(error.details.tokenSent, tokenSent);
           assert.equal(error.details.observedServerVersion, serverVersion === '0.1.7' ? '0.1.7' : null);
-          assert.deepEqual(error.details.qualifiedServerVersions, ['0.1.0', '0.1.1', '0.1.2', '0.1.5', '0.1.6']);
+          assert.equal(error.details.observedOrchestrationProtocolVersion, 3);
+          assert.equal(error.details.supportedOrchestrationProtocolVersion, 2);
+          assert.equal(error.details.qualifiedServerVersions, undefined);
         } else {
           assert.match(output, tokenSent ? /authenticated configuration/ : /no session token was sent/);
         }
@@ -221,16 +244,47 @@ test('qualification errors distinguish pre-auth admission from authenticated con
   }
 });
 
-test('getConfig independently rejects unqualified versions or protocols before refresh', async () => {
-  for (const environment of [
-    { ...descriptor, serverVersion: '0.1.3' },
-    { ...descriptor, serverVersion: '0.1.2', orchestrationProtocolVersion: 3 },
+test('admitted non-semver identity is bound before its version text is redacted for output', async () => {
+  const serverVersion = `nightly-${TOKEN}\u001b[2J?wsTicket=private-ticket`;
+  const h = harness({ discovery: { ...descriptor, serverVersion }, getConfig: () => config(serverVersion) });
+  const result = await readLimits(h.options);
+  assert.equal(result.source.serverVersion.startsWith('nightly-[redacted]'), true);
+  for (const rendered of [JSON.stringify(result), formatText(result)]) {
+    for (const hidden of [TOKEN, 'private-ticket', '\u001b']) assert.ok(!rendered.includes(hidden));
+  }
+  assert.equal(h.sockets[0].closed, true);
+});
+
+test('getConfig independently rejects malformed identity or unsupported protocol before refresh', async () => {
+  for (const [environment, code] of [
+    [{ ...descriptor, serverVersion: '' }, 'INCOMPATIBLE_RESPONSE'],
+    [{ ...descriptor, environmentId: '' }, 'INCOMPATIBLE_RESPONSE'],
+    [{ ...descriptor, orchestrationProtocolVersion: 3 }, 'UNSUPPORTED_PROTOCOL'],
   ]) {
     const h = harness({ getConfig: () => ({ ...config(), environment }) });
-    await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'UNQUALIFIED_SERVER' });
+    await assert.rejects(readLimits({ ...h.options, refresh: true }), error => error.code === code && error.details.tokenSent === true);
     assert.deepEqual(h.requests.map(request => request.tag), ['server.getConfig']);
     assert.equal(h.sockets[0].closed, true);
   }
+});
+
+test('malformed consumed quota data fails before refresh', async () => {
+  const native = config();
+  native.providers[0].usageLimits.windows[0].usedPercent = '12.5';
+  const h = harness({ getConfig: () => native });
+  await assert.rejects(readLimits({ ...h.options, refresh: true }), { code: 'INCOMPATIBLE_RESPONSE' });
+  assert.deepEqual(h.requests.map(request => request.tag), ['server.getConfig']);
+  assert.equal(h.sockets[0].closed, true);
+});
+
+test('missing RPC-only ticket route never falls back to a broad ticket', async () => {
+  const h = harness({ ticketStatus: 404 });
+  await assert.rejects(readLimits(h.options), { code: 'HTTP_STATUS' });
+  assert.deepEqual(h.http.map(call => new URL(call.url).pathname), [
+    '/.well-known/t3/environment', '/api/auth/websocket-ticket/rpc',
+  ]);
+  assert.equal(h.sockets.length, 0);
+  assert.equal(h.requests.length, 0);
 });
 
 test('HTTP error does not print response bodies or make a websocket connection', async () => {
@@ -334,18 +388,29 @@ test('CLI reads explicit stdin or native issue file, applies environment setting
   }
 });
 
-test('admission compares the exact version string and protocol number at both gates', async () => {
-  for (const environment of [
-    ...[' 0.1.5', '0.1.5 ', '0.1.5\n', 'v0.1.5', '0.1.50', '0.1.5+build.1', '0.1.60', 'v0.1.6'].map(serverVersion => ({ ...descriptor, serverVersion })),
-    { ...descriptor, serverVersion: '0.1.5', orchestrationProtocolVersion: '2' },
-  ]) {
-    const early = harness({ discovery: environment });
-    await assert.rejects(readLimits(early.options), { code: 'UNQUALIFIED_SERVER' });
-    assert.equal(early.http.length, 1);
-    const late = harness({ discovery: { ...descriptor, serverVersion: '0.1.5' }, getConfig: () => ({ ...config('0.1.5'), environment }) });
-    await assert.rejects(readLimits(late.options), { code: 'UNQUALIFIED_SERVER' });
-    assert.equal(late.sockets[0].closed, true);
+test('additive native fields do not break the consumed contract or enter the output', async () => {
+  const native = config();
+  native.newConfigField = { privateValue: TOKEN };
+  native.environment.newIdentityField = 'new-environment-value';
+  const account = native.providers[0];
+  account.newProviderField = { privateValue: TOKEN };
+  account.auth.newAuthField = 'new-auth-value';
+  account.usageLimits.newLimitsField = 'new-limits-value';
+  account.usageLimits.windows[0].newWindowField = 'new-window-value';
+  account.usageLimits.resetCredits.newResetField = 'new-reset-value';
+  const h = harness({
+    discovery: { ...descriptor, newIdentityField: 'new-environment-value' },
+    getConfig: () => native,
+  });
+  const result = await readLimits(h.options);
+  assert.equal(result.source.serverVersion, '0.1.7');
+  assert.equal(result.accounts.length, 1);
+  assert.equal(result.accounts[0].usageLimits.windows[0].remainingPercent, 87.5);
+  const rendered = JSON.stringify(result);
+  for (const field of ['newConfigField', 'newIdentityField', 'newProviderField', 'newAuthField', 'newLimitsField', 'newWindowField', 'newResetField', TOKEN]) {
+    assert.ok(!rendered.includes(field));
   }
+  assert.equal(h.sockets[0].closed, true);
 });
 
 test('every native window kind and zero boundary keeps its identity, order and absent fields', () => {
@@ -430,8 +495,8 @@ test('a refresh-phase failure closes the socket and returns no earlier snapshot'
   for (const [code, afterFirstRead, instanceId] of [
     ['REMOTE_FAILURE', request => ({ _tag: 'Exit', requestId: request.id, exit: { _tag: 'Failure', cause: [{ _tag: 'Fail', error: { message: TOKEN } }] } })],
     ['INCOMPATIBLE_RESPONSE', request => success(request, request.tag === 'server.refreshProviders' ? { providers: 'unexpected' } : config())],
-    ['UNQUALIFIED_SERVER', secondRead(config('0.1.4'))],
-    ['ENVIRONMENT_MISMATCH', secondRead(config('0.1.2'))],
+    ['UNSUPPORTED_PROTOCOL', secondRead({ ...config(), environment: { ...descriptor, orchestrationProtocolVersion: 3 } })],
+    ['ENVIRONMENT_MISMATCH', secondRead(config('0.2.0'))],
     ['INSTANCE_NOT_FOUND', secondRead({ ...config(), providers: [] }), 'codex-one'],
   ]) {
     let reads = 0;

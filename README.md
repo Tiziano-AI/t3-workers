@@ -13,14 +13,17 @@ Your main agent—the **chief** in this guide—keeps the conversation and asses
 the result. T3 runs the workers and retains their conversations. This plugin
 provides one shared skill, connection guidance and an optional quota reader;
 it does not run another server or automatically route work between accounts.
+It is an independent Tiziano AI plugin, not a T3 product. Worker operations
+use T3's official MCP directly; the skill adds instructions, not MCP tools.
 
 **Alpha.** You need your own T3 environment, **T3 0.1.4 or later**, and a
 native Codex or Claude Code client with plugin support. The operating method
 uses T3's released outside-agent MCP, with current guidance, linked
-environments included, checked at **0.1.6**. The optional quota reader is
-separately exact-version: it accepts **0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 /
-protocol 2**, and not 0.1.3 or 0.1.4. Host, provider and recovery paths are not
-all live-qualified. See
+environments included, source-reviewed at **0.1.7**; provider-mode mappings
+remain checked at 0.1.6. The optional quota reader requires **protocol 2, an
+RPC-only ticket route and compatible snapshot fields**, not a list of accepted
+releases. Older servers without that ticket route are not supported by the
+reader. Host, provider and recovery paths are not all live-qualified. See
 [architecture and qualification](docs/architecture.md#qualification).
 
 ## Install
@@ -118,10 +121,11 @@ selections are preserved.
 
 ### Limits worth knowing
 
-- **Quota reads are optional and separate from outside-agent MCP in T3 0.1.6 and the earlier qualified releases.** The
+- **Quota reads are optional and separate from outside-agent MCP in T3 0.1.7.** The
   bundled [quota reader](skills/t3-workers/references/limits.md) uses T3's native client
   RPC with a separately authorized read-only session. It requires Node.js
-  22.15+ and accepts exactly **T3 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 / protocol 2**. It
+  22.15+, **protocol 2 and the RPC-only ticket route**; consumed fields are
+  validated before returning data or refreshing. It
   reports native account/window snapshots, not an automatic quota router;
   old values can survive a failed refresh. T3's authenticated **Usage → Limits** remains the
   fallback when no reader credential is available. Installing the plugin does

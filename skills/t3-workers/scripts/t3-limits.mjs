@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// A read-only client for the T3 releases below, each qualified against its tagged native client protocol.
+// A narrow client of T3's native protocol-2 quota snapshot, with no release allowlist.
 import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -13,17 +13,10 @@ export class LimitsError extends Error {
   }
 }
 
-// Admit exact releases only. 0.1.5 and 0.1.6 use an RPC-only ticket route; their bare route also mints media-capable tickets.
-const qualifiedServers = new Map([
-  ['0.1.0', { ticketPath: '/api/auth/websocket-ticket' }],
-  ['0.1.1', { ticketPath: '/api/auth/websocket-ticket' }],
-  ['0.1.2', { ticketPath: '/api/auth/websocket-ticket' }],
-  ['0.1.5', { ticketPath: '/api/auth/websocket-ticket/rpc' }],
-  ['0.1.6', { ticketPath: '/api/auth/websocket-ticket/rpc' }],
-]);
-const qualifiedServerVersions = [...qualifiedServers.keys()];
-const qualifiedText = `${qualifiedServerVersions.join(', ')} on orchestration protocol 2`;
-const incompatible = () => new LimitsError('INCOMPATIBLE_RESPONSE', `The server response does not match the qualified T3 client protocol (${qualifiedText}).`);
+const protocolVersion = 2;
+// Never fall back to the bare route: its ticket can also authorize media access.
+const ticketPath = '/api/auth/websocket-ticket/rpc';
+const incompatible = () => new LimitsError('INCOMPATIBLE_RESPONSE', 'The server response does not match the native T3 quota client contract.');
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const string = value => typeof value === 'string' && value.length > 0;
 const iso = value => string(value) && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value));
@@ -131,10 +124,11 @@ const observedVersion = (value, token) => {
   return /^\d{1,4}\.\d{1,4}\.\d{1,4}(?:[-+][0-9A-Za-z.-]{1,48})?$/.test(text) ? text : null;
 };
 
-// Admission is the reader's qualification boundary, not a health verdict on T3.
+// Check the actual contract, not a patch-version list. Binding is rechecked after auth.
 function environmentIdentity(value, { tokenSent, token }) {
-  const malformed = !object(value) || !string(value.environmentId);
-  if (malformed || !qualifiedServers.has(value.serverVersion) || value.orchestrationProtocolVersion !== 2) {
+  const malformed = !object(value) || !string(value.environmentId) || !value.environmentId.trim() ||
+    !string(value.serverVersion) || !value.serverVersion.trim();
+  if (malformed || value.orchestrationProtocolVersion !== protocolVersion) {
     const serverVersion = malformed ? null : observedVersion(value.serverVersion, token);
     const protocol = !malformed && Number.isSafeInteger(value.orchestrationProtocolVersion) ? value.orchestrationProtocolVersion : null;
     const versionText = serverVersion !== null ? `version ${serverVersion}`
@@ -144,12 +138,11 @@ function environmentIdentity(value, { tokenSent, token }) {
     const where = tokenSent
       ? 'in its authenticated configuration; no snapshot is returned'
       : 'before authentication, so no session token was sent';
-    throw new LimitsError('UNQUALIFIED_SERVER',
-      `${reported} ${where}. This reader admits only releases it has qualified (${qualifiedText}). ` +
-      'This is a reader qualification limit, not evidence that T3 is faulty; read limits in T3 itself or use a reader qualified for this release.',
-      4, { observedServerVersion: serverVersion, observedOrchestrationProtocolVersion: protocol, qualifiedServerVersions, tokenSent });
+    throw new LimitsError(malformed ? 'INCOMPATIBLE_RESPONSE' : 'UNSUPPORTED_PROTOCOL',
+      `${reported} ${where}. This reader requires an environment identity and orchestration protocol ${protocolVersion}; read limits in T3 itself if that contract is unavailable.`,
+      4, { observedServerVersion: serverVersion, observedOrchestrationProtocolVersion: protocol, supportedOrchestrationProtocolVersion: protocolVersion, tokenSent });
   }
-  const identity = { environmentId: value.environmentId, serverVersion: value.serverVersion, orchestrationProtocolVersion: 2 };
+  const identity = { environmentId: value.environmentId, serverVersion: value.serverVersion, orchestrationProtocolVersion: protocolVersion };
   optional(identity, 'label', value.label);
   return identity;
 }
@@ -163,6 +156,7 @@ export function normalizeConfig(config, { url, token, instanceId, refreshRequest
     throw new LimitsError('ENVIRONMENT_MISMATCH', 'The server identity or version changed during the read, or does not match the requested environment.');
   }
   environment.environmentId = cleanText(environment.environmentId, token);
+  environment.serverVersion = cleanText(environment.serverVersion, token);
   if (environment.label !== undefined) environment.label = cleanText(environment.label, token);
   const providers = instanceId !== undefined ? config.providers.filter(p => p?.instanceId === instanceId) : config.providers;
   if (instanceId !== undefined && providers.length === 0) throw new LimitsError('INSTANCE_NOT_FOUND', 'The requested provider instance is not in this environment.', 2);
@@ -269,7 +263,6 @@ export async function readLimits({ url = 'http://127.0.0.1:3773', token, instanc
     const descriptor = environmentIdentity(await requestJson('/.well-known/t3/environment'), { tokenSent: false, token });
     checkAborted(controller.signal);
     if (environmentId && descriptor.environmentId !== environmentId) throw new LimitsError('ENVIRONMENT_MISMATCH', 'The discovered environment does not match the requested environment. No session token was sent.');
-    const { ticketPath } = qualifiedServers.get(descriptor.serverVersion);
     const ticket = await requestJson(ticketPath, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
     checkAborted(controller.signal);
     if (!object(ticket) || !string(ticket.ticket) || !iso(ticket.expiresAt)) throw incompatible();
@@ -311,8 +304,9 @@ export function formatText(result) {
 const HELP = `Usage: node t3-limits.mjs [--url ORIGIN] [--environment-id ID] [--instance ID] [--refresh] [--json]
                           [--token-stdin | --token-file PATH] [--timeout-ms N]
 
-Read the native provider-limit snapshot from T3 ${qualifiedText}. Requires Node >=22.15.
-Other versions are rejected before any session token is sent (UNQUALIFIED_SERVER).
+Read T3's native provider-limit snapshot. Requires Node >=22.15, orchestration protocol 2,
+the RPC-only ticket route and compatible snapshot fields; server versions are not allowlisted.
+Identity and protocol are checked before any session token is sent; config is checked after auth.
 Auth: exactly one of T3_WORKERS_TOKEN, --token-stdin, or --token-file (raw token/native issue JSON).
 URL: --url, then T3_WORKERS_URL, then http://127.0.0.1:3773.
 Environment pin: --environment-id or T3_WORKERS_ENVIRONMENT_ID. No token is sent before discovery.

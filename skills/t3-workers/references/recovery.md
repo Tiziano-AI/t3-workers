@@ -44,7 +44,7 @@ session; they do not apply to the native `t3 thread` CLI.
 | A linked machine's call failed | Read `t3_environment_links`. If the link expired, the worker's thread stays on that machine: the user links the machine again with a new pairing code from it, then recover the worker by its IDs, or by unique title there, with the same `environmentId`. The new link is a new sign-in on that machine, so a launch or send key used before it need not deduplicate after it. Do not relaunch the assignment on another machine, account or route. If the link is only unreachable, retry the read later rather than repeating an effect. |
 | Wait returned without a terminal run | Read the thread's `pendingRequestCount` and recent activity before waiting again. The count includes approvals; `t3_pending_request` lists only questions, so an empty list or a `running`/`waiting` status does not rule out an approval. Bring a pending approval to the user with the worker's `link`, the requested action and what waits on it; the person answers it in T3. A Cursor worker raises no T3 approval: look for refusals in its activity instead. |
 | Provider failed, account is exhausted, or quota is unknown | Preserve any result and report the precise gap. Do not change account/model, consume a reset, reauthenticate, or launch a replacement without the necessary authority. Distinguish observed failure from stale or unavailable capacity information. |
-| Worker says it is done | Read the complete needed result, check the requested output and known effects. Terminal status alone does not establish a successful commission or artifact delivery. |
+| Worker says it is done | If the commission includes delegated/background work, use `t3_thread_wait` with `untilDelegatedWorkSettled: true` where supported, then read the final answer identified by `resultRun`. Read the complete needed result, check the requested output and known effects. Terminal status alone does not establish a successful commission or artifact delivery. |
 | A worker's worktree is gone | T3's storage cleanup may have retired it after inactivity. The branch, commits and conversation remain, and the next message recreates the worktree from the branch without its ignored files. Recover what the branch holds; outputs that lived only in ignored files are gone unless they were kept elsewhere. |
 
 ## When a route is blocked
@@ -78,12 +78,21 @@ route. Do not reach the same effect by another route; report what it blocks.
 In either case keep partial results that are useful, labeled with what they
 cover.
 
-## Interrupt a real run
+## Interrupt a turn or stop the assignment
 
-When stopping is authorized, call `t3_thread_interrupt` with the exact thread,
-the known active `runId` where supported, and a stable `clientRequestId` for
-that interruption. Keep the returned state. Reuse its key for an identical
-retry; reconcile first if the authenticated session changed.
+Choose the operation that matches the authorized effect:
+
+- To interrupt only the active turn, call `t3_thread_interrupt` with the
+  exact thread and known active `runId` where supported.
+- To stop the thread's whole assignment, pass `stop: true` where supported.
+  This is T3's Stop behavior: interrupt the current turn, hold queued messages,
+  and stop delegates and PR watches. `runId` is ignored in this mode. A linked
+  older peer can drop the `stop` field and interrupt only the turn, so verify
+  the target's behavior rather than assuming a forwarded call stopped it all.
+
+Use a stable `clientRequestId` for that logical interruption/stop and retain
+the returned state. Reuse its key only for an identical retry; reconcile first
+if the authenticated session changed.
 
 `interrupt_requested` is acceptance, not a completed stop. Wait/read the run
 until terminal, inspect activity, and account for files, external processes,
@@ -95,6 +104,9 @@ result can win the race; read it rather than claiming it was cancelled.
 If terminal state or surviving effects cannot be established, say exactly what
 is uncertain and retain the IDs and recovery route. Never claim rollback from
 an interruption acknowledgement.
+
+[Native wait and stop contract](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L486-L529),
+[stop and older-peer forwarding](https://github.com/pingdotgg/t3code/blob/v0.1.7/apps/server/src/mcp/OrchestratorMcpService.ts#L3188-L3237).
 
 ## Return and handoff
 

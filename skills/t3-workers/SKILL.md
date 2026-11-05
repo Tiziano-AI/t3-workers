@@ -37,7 +37,7 @@ These references travel with the skill; they are not separate integrations.
    plugin-managed connection can have different prefixes. If several T3
    connections exist, resolve the intended environment before an effect;
    distinguish their configured endpoints and relevant project inventories.
-   This method requires T3 **0.1.4 or later** and is checked at **v0.1.6**;
+   This method requires T3 **0.1.4 or later**; its core lifecycle is source-checked at **v0.1.7**;
    `t3_environment_read` reports the connected server's version.
 2. Call `orchestrator_capabilities`. Inspect provider instances, the model
    shortlist, supported options, constraints, and permission ceiling. If the
@@ -91,7 +91,7 @@ across providers are not equivalent token budgets, and another thread does not
 create more account capacity.
 
 Use a suitable native structured capacity tool if the connected release
-exposes one. Released T3 **v0.1.6**, like the earlier qualified releases,
+exposes one. Released T3 **v0.1.7**
 has no outside-agent MCP quota tool. This package's optional reader uses native client RPC instead:
 
 ```sh
@@ -103,7 +103,8 @@ Replace the example path with this installed skill's directory. Read
 22.15+ and an explicitly supplied normal T3 read-only session, **not** the MCP
 OAuth credential. Do not issue a session as an unrequested preflight. Default
 to published snapshots; `--refresh` explicitly requests native status probes.
-The reader accepts exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2 and covers native
+The reader requires protocol 2, the RPC-only ticket route and compatible
+snapshot fields, not an allowlist of server releases. It covers native
 provider instances, not pooled external usage sources. Use the authenticated
 **Usage → Limits** UI when the reader is unavailable. Keep unknown capacity
 unknown; do not treat it as zero or unlimited, or block an authorized bounded
@@ -226,6 +227,11 @@ T3, so tell the user when a worker runs in a mode that may ask them.
    below before waiting again. A timeout leaves the work running. A terminal
    run can have failed or produced only part of the requested result; a
    completed turn is not necessarily a completed commission.
+   When the commission includes work the worker delegates or runs in the
+   background, pass `untilDelegatedWorkSettled: true` where the target schema
+   supports it. This also waits for that work and its result deliveries.
+   Read the final answer identified by `resultRun`, not just the initial run.
+   After a nonterminal wait, still check pending requests before waiting again.
 
 Use `t3_thread_send` modes intentionally: `queue` requests a separate follow-up
 turn, `steer` changes an active turn, and `restart` interrupts and restarts it.
@@ -313,8 +319,14 @@ Runtime modes and request observation are checked against released v0.1.6:
 [pending count](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L848-L850),
 [question list](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/thread/handlers.ts#L224-L235)
 and [wait settlement](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/ThreadManagementService.ts#L928-L936).
+The core launch/configuration, request/replay and linked-environment behavior
+was reviewed against v0.1.7. The native
+[delegation wait](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L486-L506)
+and [thread stop](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L509-L529)
+are distinct from waiting for or interrupting one run; see recovery before
+stopping work. Provider-mode mappings above remain checked at v0.1.6.
 See [Quota reader](references/limits.md)
-for version qualification, separate sessions, and freshness.
+for contract requirements, separate sessions, and freshness.
 Use current callable schemas for syntax and newly supported capabilities;
 neither this skill nor a pinned catalog proves what this host can invoke.
 Use [Connect the chief](references/setup.md) for installation and OAuth, not

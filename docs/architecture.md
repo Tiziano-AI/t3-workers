@@ -47,6 +47,15 @@ internal T3 parent, not this chief. Providers map the same mode differently,
 and Cursor raises no T3 approval at all; the capability reference records the
 v0.1.6 mappings and their unknowns.
 
+Follow delegated/background work with the native
+`t3_thread_wait.untilDelegatedWorkSettled` option and read `resultRun`, rather
+than treating the initial terminal turn as the whole assignment. Distinguish
+single-run interruption from `t3_thread_interrupt.stop: true`, which also
+holds the queue and stops delegates and PR watches. Verify linked-peer
+support and surviving effects. These controls were already present in the
+v0.1.6 contract but omitted from this method; the v0.1.7 source review repaired
+that omission, not a missing T3 capability.
+
 The native v0.1.2 thread CLI serves local scripts, but lacks controls needed by
 this cycle, including idle-first launch, model options and caller-supplied
 retry keys. MCP remains the chief surface; the setup reference explains the
@@ -85,27 +94,30 @@ identity reuse remove more user work than they create.
 
 ## A narrow quota seam
 
-T3 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6 expose provider quota through their first-party client
-RPC, but not outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
+T3 v0.1.7 exposes provider quota through its first-party client RPC, but not
+outside-agent MCP. `skills/t3-workers/scripts/t3-limits.mjs` fills only
 that read: environment discovery, a native WebSocket ticket, unary Effect RPC, and
 whitelisted account/window output. It has no dependencies beyond Node.js
 22.15+, no provider integrations, no cache and no process that stays alive.
 
 This is a source-visible **native client contract**, not a documented stable
-third-party quota API. The command accepts exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6, all on
-protocol 2, and rejects other descriptor versions before sending a session token. Qualify
-new versions deliberately; do not silently widen the gate. Prefer a suitable
-native quota tool if T3 adds one, then retire this adapter rather than
-maintaining two ways to read the same data. An
-[open upstream proposal](https://github.com/pingdotgg/t3code/pull/26439) would
-return usage from `orchestrator_capabilities` behind an environment setting;
-until a release carries it, the reader stays exact-version.
+third-party quota API. It checks identity and orchestration protocol 2 before
+sending a session token, always requests an RPC-only ticket, then validates
+the environment/version binding and consumed fields. Server version is
+diagnostic identity data, not an allowlist or a semver compatibility promise.
+Incompatible contracts fail; additive fields are ignored. Prefer a suitable
+native quota tool if a released T3 server exposes one, then retire this adapter
+rather than maintaining two ways to read the same data. The
+[v0.1.7 MCP capability contract](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L548-L604)
+does not include quota. An upstream proposal alone does not establish release
+support.
 
-For v0.1.5 and v0.1.6 it uses the audience-specific `/api/auth/websocket-ticket/rpc`
-route, not the broader media-capable bare ticket route. The authenticated
-config must match the descriptor's admitted version and environment before
-refresh. Qualification diagnostics distinguish pre-auth rejection from a
-post-auth config rejection without echoing credentials or raw config.
+The audience-specific `/api/auth/websocket-ticket/rpc` route is a requirement,
+with no fallback to the broader media-capable bare route. This removes reader
+support for older servers without it, including 0.1.0–0.1.2. The environment,
+version and selected instance must match before any refresh. Diagnostics
+distinguish pre-auth rejection from post-auth validation without echoing
+credentials or raw config.
 
 The caller supplies a normal environment bearer session with
 `orchestration:read`. MCP OAuth credentials have a different audience and
@@ -143,14 +155,15 @@ This is an **alpha** that requires T3 0.1.4 or later, with a released T3
 0.1.0 outside-agent baseline, discovery/project-default guidance for v0.1.2,
 outside-chief exposure and recovery checked at v0.1.5, linked environments,
 launch model resolution, worktree cleanup, runtime modes and request
-observation checked at v0.1.6, and a quota
-reader admitting
-exactly 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2. Schema/source
+observation checked at v0.1.6. A v0.1.7 source review checked the core
+launch/configuration, request/replay, linked-environment and wait/stop behavior,
+plus the quota reader's protocol, RPC-only ticket and consumed snapshot
+contracts. Provider-mode mappings remain checked at v0.1.6. Schema/source
 checks, catalog fetching, host loading, authentication and successful worker
 execution are separate qualification steps; public availability does not
 establish them all.
 
-The quota command passed real snapshot reads against T3 0.1.0 on 18 October
+Earlier versions of the quota command passed real snapshot reads against T3 0.1.0 on 18 October
 2026, 0.1.1 on 21 October 2026, and 0.1.2 on 23 October 2026, all on protocol 2
 across Codex, Claude and Grok instances. The temporary read-only sessions were
 revoked after the readers exited; the v0.1.2 check also confirmed that the
@@ -159,10 +172,13 @@ reads requested no refresh or inference. They qualify transport and parsing,
 not fresh provider observations, available allowance, plugin installation or a
 worker cycle. The v0.1.2 quota/snapshot and auth/ticket contracts are
 source-compatible.
-Synthetic tests cover every admitted version and rejection of unknown
-versions, incompatible protocols and the wrong environment before credential
-transmission. Source compatibility and these live reads do not establish that
-a chief has loaded this source version.
+Those are historical transport checks, not current support for the broader
+legacy ticket route. Current synthetic tests cover contract admission across
+release numbers, incompatible consumed fields, no broad-ticket fallback,
+and rejection of malformed identity, incompatible protocol and the wrong
+environment before credential transmission. Neither source review nor those
+tests establish an authenticated live v0.1.7 read or that a chief loaded this
+source version.
 
 On 30 October 2026, a real v0.1.5/protocol 2 snapshot read from the updated
 source passed without refresh or inference. The tagged v0.1.5 descriptor,
@@ -175,8 +191,9 @@ On 1 November 2026, v0.1.6 was qualified by comparing the reader's tagged
 sources with v0.1.5, checking the installed v0.1.6 server binary and reading a
 live v0.1.6 descriptor: the reader admitted it before authentication and
 reached the RPC-only ticket route, which refused a placeholder credential.
-No authenticated v0.1.6 snapshot read was part of that check. The quota guide
-records the compared sources.
+No authenticated v0.1.6 snapshot read was part of that check. This was a
+qualification of the earlier reader, not an exact-release requirement for
+the current one.
 
 An independent read-only v0.1.2 acceptance check exercised live discovery,
 model search and recovery of an existing worker's configuration and state.

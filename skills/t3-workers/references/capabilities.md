@@ -7,11 +7,11 @@ project-default changes checked in **released v0.1.2** and outside-chief
 exposure/recovery checked in **released v0.1.5**. The method requires **T3
 0.1.4 or later**; linked environments, launch model resolution, worktree
 cleanup, runtime modes and request observation are checked in **released
-v0.1.6**. Quota contract support is
-source-checked for 0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6; source support and a
-live read are separate claims. This does not assert that intervening or later
-contracts are identical. Use the connected tool schemas for current syntax and
-exposure.
+v0.1.6**. Core launch/configuration, request/replay, linked-environment and
+wait/stop behavior were reviewed against **v0.1.7**. The quota reader's actual
+contracts are source-checked at v0.1.7, not gated by release number; source
+review and a live read are separate claims. Use the connected tool schemas
+for current syntax and exposure.
 
 ## What each side owns
 
@@ -48,10 +48,11 @@ explicitly and compare the returned `modelSelection` with it.
 [Launch resolution](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/toolkits/project/handlers.ts#L168-L206),
 [usage fallback](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/shared/src/usageLimits.ts#L64-L101)
 
-**Released v0.1.6, like the earlier qualified releases, has no outside-agent MCP quota read.** The bundled
+**Released v0.1.7 has no outside-agent MCP quota read.** The bundled
 [quota reader](limits.md) reads T3's native provider snapshots through its
-client RPC with a separately authorized environment session. It accepts exactly
-0.1.0, 0.1.1, 0.1.2, 0.1.5 and 0.1.6/protocol 2; this is not a promised stable third-party API.
+client RPC with a separately authorized environment session. It requires
+protocol 2, an RPC-only ticket route and compatible consumed fields, not an
+allowlist of server versions. This is not a promised stable third-party API.
 The authenticated **Usage → Limits** UI remains the fallback and can also include
 pooled/external usage sources outside the reader's coverage. Available windows
 depend on the provider/auth path:
@@ -69,10 +70,9 @@ does not override an exhausted weekly window. Do not add percentages across
 providers or treat them as comparable token budgets. Unknown allowance is
 neither zero nor unlimited. See the
 [released usage guide](https://github.com/pingdotgg/t3code/blob/v0.1.0/docs/user/usage.md#L79-L122).
-The reader's additional 0.1.2 support uses the
-[released native quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts)
-and does not expand its scope to pooled sources, imply fresh provider probes,
-or by itself establish live qualification.
+The [v0.1.7 native quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/providerUsageLimits.ts)
+does not expand this reader's scope to pooled sources, imply fresh provider
+probes, or by itself establish live qualification.
 
 There is no automatic capacity router or reset mechanism in this package.
 Capacity can inform an authorized choice; it does not authorize silently
@@ -187,6 +187,25 @@ outside chief with `thread_credential_required`.
 [approval activity](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L914-L917),
 [wait settlement](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/orchestration-v2/ThreadManagementService.ts#L928-L936),
 [internal pendingApproval](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/mcp/OrchestratorMcpService.ts#L479-L523)
+
+**Settling delegated work.** When the commission includes children or
+background work, use `t3_thread_wait` with `untilDelegatedWorkSettled: true`
+where supported. This waits for that work and its completion deliveries;
+`resultRun` identifies the run carrying the final answer. A terminal initial
+turn alone does not settle the whole assignment. Nonterminal waits still
+require the pending-request checks above, and settlement still requires
+reading and evaluating the result.
+[Native wait contract](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L486-L506)
+
+**Interrupt and Stop differ.** `t3_thread_interrupt` with an exact `runId`
+interrupts a turn. With `stop: true`, it performs T3's thread Stop: interrupt
+the current turn, hold queued messages, and stop delegates and PR watches;
+`runId` is ignored. An older linked peer can drop `stop` and only interrupt
+the turn. Match the call to the authorized effect, then reconcile actual
+state and surviving effects; an acknowledgement proves neither a complete
+stop nor rollback. See [recovery](recovery.md#interrupt-a-turn-or-stop-the-assignment).
+[Stop contract](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L509-L529),
+[forwarding boundary](https://github.com/pingdotgg/t3code/blob/v0.1.7/apps/server/src/mcp/OrchestratorMcpService.ts#L3188-L3237)
 
 ### Host tool filters
 

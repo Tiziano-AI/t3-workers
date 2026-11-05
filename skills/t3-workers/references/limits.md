@@ -2,65 +2,48 @@
 
 Use `scripts/t3-limits.mjs` relative to this skill's directory when the chief
 needs structured native-provider allowance. It requires **Node.js 22.15+**,
-T3 **0.1.0, 0.1.1, 0.1.2, 0.1.5 or 0.1.6 / orchestration protocol 2**, and a caller-supplied
+T3's **orchestration protocol 2, RPC-only ticket route and compatible snapshot
+fields**, and a caller-supplied
 environment bearer session with `orchestration:read`. There are no npm
 dependencies or global installation. Replace the example script path below
-with this installed skill's directory. This is a version-qualified client of T3's first-party
+with this installed skill's directory. This is a narrow client of T3's first-party
 RPC, not a documented stable third-party quota API or an MCP wrapper.
 
-The descriptor gate runs before bearer transmission. `UNQUALIFIED_SERVER`
-means a malformed identity or a version/protocol not admitted by this reader,
-not that T3 or its quota service is broken. The authenticated configuration is
-checked again: a rejection there occurs after token transmission and returns
-no snapshot. A change between admitted descriptor/config versions or identity
-fails with `ENVIRONMENT_MISMATCH` before any refresh. Releases 0.1.3 and 0.1.4
-remain unqualified; do not bypass the gate or assume a numeric range. The
-reader stays exact-version until T3 offers outside agents a supported quota
-read; an [open upstream proposal](https://github.com/pingdotgg/t3code/pull/26439)
-would add usage to `orchestrator_capabilities` behind an environment setting.
+## Compatibility, not a release allowlist
 
-The v0.1.2 contract is source-compatible with the earlier admitted releases.
-A real v0.1.2 snapshot read passed on 23 October 2026 without refresh or
-inference; the temporary read-only session was revoked after the reader exited,
-and the same token was then rejected. This qualifies transport and parsing,
-not fresh provider observations or available allowance.
-[Released quota contract](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/providerUsageLimits.ts),
-[provider snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.2/packages/contracts/src/server.ts#L217-L281).
+The reader checks the descriptor's identity and protocol **before** sending
+the bearer. It then uses only `POST /api/auth/websocket-ticket/rpc`. There is
+no fallback to the bare ticket route, which also permits media. Older servers
+without the RPC-only route, including 0.1.0–0.1.2, are no longer supported by
+this reader; use T3's own UI instead. This requirement replaces the former
+exact-release allowlist that incorrectly blocked 0.1.7 without testing its
+contract.
 
-The v0.1.5 qualification checked the tagged descriptor, audience-specific
-ticket routes, RPC handshake, config/refresh contracts and native snapshot
-fields. It uses `POST /api/auth/websocket-ticket/rpc` for an RPC-only ticket;
-the bare route also permits media and is not needed for this read. Earlier
-admitted releases use their bare ticket route. A real v0.1.5 snapshot read
-passed on 30 October 2026 without refresh or inference; it establishes
-transport/parsing, not fresh upstream observations or spare capacity.
-[Descriptor](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/environment.ts#L159-L169),
-[ticket routes](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/environmentHttp.ts#L557-L571),
-[ticket audiences](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/auth/EnvironmentAuth.ts#L1192-L1272),
-[RPC handshake](https://github.com/pingdotgg/t3code/blob/v0.1.5/apps/server/src/ws.ts#L3271-L3297),
-[config/refresh](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/rpc.ts#L623-L647),
-[snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/server.ts#L206-L267),
-[quota fields](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/contracts/src/providerUsageLimits.ts#L13-L49),
-[last-good retention](https://github.com/pingdotgg/t3code/blob/v0.1.5/packages/provider-core/src/server/usageLimits.ts#L102-L121).
+The authenticated configuration must match the descriptor's environment and
+version. Binding, selected instance and consumed snapshot fields are validated
+before any refresh. A version is identity/diagnostic data, not a compatibility
+decision: additive fields are ignored, while an unsupported protocol or
+incompatible consumed shape fails. Protocol 2 alone is not a promise that a
+future server will work; its ticket, RPC and response contracts must still match.
 
-The v0.1.6 qualification compared each of those sources between the v0.1.5
-and v0.1.6 tags. Ticket routes, quota fields and last-good retention are
-unchanged. The descriptor adds only optional capability flags, and the server
-contract adds an unrelated npm-release read; the configuration and provider
-snapshot shapes are unchanged. `server.refreshProviders` gains an optional
-`reloadSecrets`, which the reader never sends. The ticket response now decodes
-its value as a redacted string, which still travels as the same JSON string.
-Ticket audiences and the RPC handshake keep their checks. The installed
-v0.1.6 server binary carries the same routes and RPC names. On 1 November 2026
-a live v0.1.6 server reported 0.1.6/protocol 2; the reader admitted it before
-authentication and reached the RPC-only ticket route, which rejected a
-placeholder credential with HTTP 401. That establishes admission and route
-selection, not an authenticated v0.1.6 snapshot read, which is a separate check.
-[Descriptor](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/environment.ts#L167-L177),
-[ticket result](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/auth.ts#L240-L243),
-[ticket audiences](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/auth/EnvironmentAuth.ts#L1203-L1283),
-[RPC handshake](https://github.com/pingdotgg/t3code/blob/v0.1.6/apps/server/src/ws.ts#L3288-L3314),
-[config/refresh](https://github.com/pingdotgg/t3code/blob/v0.1.6/packages/contracts/src/rpc.ts#L633-L659).
+The contracts below were source-reviewed at **v0.1.7**. That review and the
+synthetic tests are not an authenticated live read. Historical live-read
+evidence and its limits belong in
+[architecture and qualification](../../../docs/architecture.md#qualification).
+
+- [Environment descriptor](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/environment.ts)
+- [Ticket routes](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/environmentHttp.ts)
+  and [ticket uses](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/auth.ts)
+- [Config/refresh RPC](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/rpc.ts)
+  and [provider snapshots](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/server.ts)
+- [Quota fields](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/providerUsageLimits.ts)
+
+T3 v0.1.7 still has no outside-agent MCP quota read. Prefer a suitable native
+MCP tool when a released server exposes one, then retire this helper rather
+than maintaining a parallel read path. The
+[v0.1.7 capability contract](https://github.com/pingdotgg/t3code/blob/v0.1.7/packages/contracts/src/orchestratorMcp.ts#L548-L604)
+has no usage field; an [upstream proposal](https://github.com/pingdotgg/t3code/pull/26439)
+is not evidence that a release includes it.
 
 ## Read the intended environment
 
@@ -79,7 +62,7 @@ accepted; URL credentials, paths, queries and fragments are rejected. URL
 selection is `--url`, then `T3_WORKERS_URL`, then local
 `http://127.0.0.1:3773`. For a remote environment, select it explicitly.
 Pin a known identity with `--environment-id ID` or
-`T3_WORKERS_ENVIRONMENT_ID`; descriptor identity/version is checked **before**
+`T3_WORKERS_ENVIRONMENT_ID`; descriptor identity/protocol is checked **before**
 sending the bearer token. HTTPS still relies on normal server trust; an
 environment ID is not cryptographic identity proof.
 
@@ -194,13 +177,17 @@ sources are **not** included. Reset counts are reported, never consumed.
 [Native fields](https://github.com/pingdotgg/t3code/blob/v0.1.0/packages/contracts/src/providerUsageLimits.ts#L20-L70).
 
 Errors instead return `schemaVersion: 1` and `error: {code, message}` with
-optional `error.details`. For `UNQUALIFIED_SERVER`, details include a sanitized
+optional `error.details`. For descriptor/protocol rejections, details include a sanitized
 `observedServerVersion` (or `null`), `observedOrchestrationProtocolVersion`,
-`qualifiedServerVersions` and `tokenSent`; inspect the latter to distinguish
+`supportedOrchestrationProtocolVersion` and `tokenSent`; inspect the latter to distinguish
 pre-auth admission from the authenticated configuration check. Exit codes:
 `0` successful snapshot, `2` invalid input/auth source or missing instance,
-`3` HTTP/transport failure, `4` unqualified/incompatible protocol or identity,
+`3` HTTP/transport failure, `4` unsupported/incompatible protocol, shape or identity,
 `5` native RPC rejection, `6` deadline. Successful reads may contain unknown,
 unsupported or exhausted quotas; those are data, not command failures. Error
 codes distinguish the failing step without dumping server config, raw RPC
 frames, tokens or stack traces. No provider/account fallback is performed.
+`UNSUPPORTED_PROTOCOL` names a protocol mismatch; `INCOMPATIBLE_RESPONSE` names
+a malformed identity or consumed response. `ENVIRONMENT_MISMATCH` names a
+changed or incorrectly selected environment/version. A ticket HTTP failure
+never retries on the broader ticket route.

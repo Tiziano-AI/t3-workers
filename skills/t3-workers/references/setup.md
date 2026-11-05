@@ -98,26 +98,23 @@ OAuth callbacks or paste secrets into chat. See [T3 outside-agent setup](https:/
 [native Codex MCP](https://learn.chatgpt.com/docs/extend/mcp#connect-an-existing-mcp-server)
 and [Claude MCP](https://code.claude.com/docs/en/mcp).
 
-When the person asks the chief to start the login from its own shell, that
-shell is not a terminal; a Claude Code chief's shell, for example, reads
-standard input from `/dev/null`. Two host behaviors follow (Codex CLI 0.166.0,
-Claude Code 2.1.316). Run Codex without `--no-browser`: `codex mcp login t3`
-prints the sign-in address, opens it in the browser of the machine running the
-login and waits up to five minutes without reading standard input; with
-`--no-browser` it reads the final URL from standard input and stops as soon as
-that input ends. `claude mcp login` deletes its stored token and then gives up
-unless standard input is a terminal. On macOS,
-`script -q /dev/null claude mcp login t3 --no-browser < <(sleep 300)` provides
-a terminal and keeps its input open, since `script` passes the end of its own
-input on and that cancels the login; the `sleep` ends on its own. Both logins
-wait up to five minutes, so give the call longer than that or run it in the
-background: stopping it early abandons the attempt and leaves a Claude chief
-signed out. Approval returns to a `localhost` address on the computer that
-opened the page, so the person opens the page on the machine running the
-login, enters the pairing code and chooses the access. Opened elsewhere, the
-page's final URL has to be pasted into the CLI's own prompt, which a chief's
-shell cannot take without passing it through chat; the person then runs the
-login in their own terminal instead.
+When the person asks the chief to start login from its executor, inspect that
+executor's terminal support instead of assuming its input is interactive.
+Use the host's supported PTY/resumable session for a CLI that requires a
+terminal, or let the person run the same native command in their own terminal.
+Do not emulate an interactive session with a sleeping stdin feeder, leave an
+unmanaged background login, or pass OAuth callbacks through chat.
+
+Observed with Codex CLI 0.166.0 and Claude Code 2.1.316: normal
+`codex mcp login t3` opens the local browser and waits without reading stdin;
+`--no-browser` needs interactive callback input. `claude mcp login` requires
+a terminal and deletes its stored token before consent, so an abandoned
+attempt can leave the chief signed out even while T3's old grant remains
+valid. Keep control of the login until its native success, failure or
+cancellation. The person completes consent on the machine running the login;
+if the callback cannot reach that machine, have them use the client's native
+browserless flow in their own terminal. Do not restart login blindly after
+an uncertain result; inspect native login/connection state first.
 
 ## Consent and the three kinds of authentication
 
