@@ -176,9 +176,8 @@ Those are historical transport checks, not current support for the broader
 legacy ticket route. Current synthetic tests cover contract admission across
 release numbers, incompatible consumed fields, no broad-ticket fallback,
 and rejection of malformed identity, incompatible protocol and the wrong
-environment before credential transmission. Neither source review nor those
-tests establish an authenticated live v0.1.7 read or that a chief loaded this
-source version.
+environment before credential transmission. Those tests alone establish
+neither live transport nor selection by an installed chief.
 
 On 30 October 2026, a real v0.1.5/protocol 2 snapshot read from the updated
 source passed without refresh or inference. The tagged v0.1.5 descriptor,
@@ -194,6 +193,17 @@ reached the RPC-only ticket route, which refused a placeholder credential.
 No authenticated v0.1.6 snapshot read was part of that check. This was a
 qualification of the earlier reader, not an exact-release requirement for
 the current one.
+
+On 6 November 2026, the current contract-validating source reader passed one
+authenticated v0.1.7/protocol 2 snapshot read, with the intended environment
+pinned and no refresh or inference. Descriptor/configuration binding, the
+RPC-only ticket route and parsing of the returned native-instance and
+published limit/window fields succeeded. Published limit observations
+predated the read; this does not establish fresh provider allowance,
+all-provider behavior, installed-plugin selection or a full worker lifecycle.
+After the reader exited, its single temporary read-only session was revoked
+and verified absent from the active list, then its private temporary material
+was removed.
 
 An independent read-only v0.1.2 acceptance check exercised live discovery,
 model search and recovery of an existing worker's configuration and state.
