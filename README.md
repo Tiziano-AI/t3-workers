@@ -11,9 +11,10 @@ interrupted assignment without starting over.
 
 Your main agent—the **chief** in this guide—keeps the conversation and assesses
 the result. T3 runs the workers and retains their conversations. This plugin
-provides one shared skill, connection guidance, an optional quota reader and,
-for Claude Code inside T3, a skill that lets a workflow run any of its agents as
-a T3 worker; it does not run another server or automatically route work between accounts.
+provides one shared skill, connection guidance and an optional quota reader; it
+does not run another server or automatically route work between accounts. A
+Claude Code chief that itself runs inside a T3 thread uses the separate
+[T3 Workflow Relay](#mix-t3-workers-into-a-claude-code-workflow) plugin instead.
 It is an independent Tiziano AI plugin, not a T3 product. Worker operations
 use T3's official MCP directly; the skill adds instructions, not MCP tools.
 
@@ -162,10 +163,22 @@ polling daemon.
 ## Mix T3 workers into a Claude Code workflow
 
 A Claude Code chief inside a T3 thread writes its own Workflow scripts. The
-`t3-workflow-relay` skill lets any agent in such a script run as a T3 worker on
-another account or provider, beside native agents: some of them, all of them
-or none. The script stays the chief's own. An agent on the chief's own account
-remains a plain `agent()`.
+separate, Claude-only T3 Workflow Relay plugin lets any agent in such a script
+run as a T3 worker on another account or provider, beside native agents: some
+of them, all of them or none. The script stays the chief's own. An agent on the
+chief's own account remains a plain `agent()`.
+
+Install it in the Claude Code configuration home that T3 runs your chief in,
+by running the commands with that home as `CLAUDE_CONFIG_DIR`. It is not part
+of `t3-workers`, which serves a chief outside T3:
+
+```sh
+CLAUDE_CONFIG_DIR=<T3-claude-home> claude plugin marketplace add Tiziano-AI/plugins
+CLAUDE_CONFIG_DIR=<T3-claude-home> claude plugin install t3-workflow-relay@tiziano-ai --scope user
+```
+
+In a script, the chief declares each worker's target and calls `t3Agent()`
+where it would call `agent()`:
 
 ```js
 const codex = { providerInstanceId: '<provider-instance-id>', model: '<model>',
@@ -178,8 +191,8 @@ const verdict = await agent(`Read ${built.out} and try to refute it.`)
 
 Each relay is one cheap Claude agent that makes one `delegate_task` call and
 returns its worker's two status lines. The worker has its own T3 thread and
-its result stays in its file. The skill carries the function to paste into the
-script and the rules that come with it.
+its result stays in its file. The plugin's one skill, `t3-workflow-relay`,
+carries the function to paste into the script and the rules that come with it.
 
 **The chief must itself be a Claude Code session running inside a T3 thread, on
 the machine where the output files live,** and it keeps its turn open until the
@@ -201,7 +214,12 @@ For Claude Code:
 ```sh
 claude plugin marketplace update tiziano-ai
 claude plugin update t3-workers@tiziano-ai --scope user
+claude plugin update t3-workflow-relay@tiziano-ai --scope user
 ```
+
+Run these in each configuration home a plugin is installed in, the
+marketplace update included: the relay usually lives in a T3 home, `t3-workers`
+in the home of a chief outside T3.
 
 Reload the supported host or start a new session and check the selected version.
 Check the same configuration home you installed into. A Claude session using
@@ -220,6 +238,7 @@ For Claude Code:
 
 ```sh
 claude plugin uninstall t3-workers@tiziano-ai --scope user
+claude plugin uninstall t3-workflow-relay@tiziano-ai --scope user
 ```
 
 Disabling or uninstalling this plugin leaves the separately configured MCP
@@ -235,6 +254,7 @@ python3 -m unittest discover -s tests -v
 node --test tests/limits.test.mjs tests/t3-workflow-relay.test.mjs
 claude plugin validate --strict .
 claude plugin validate --strict .claude-plugin/plugin.json
+claude plugin validate --strict plugins/t3-workflow-relay
 ```
 
 These check this repository's manifests, delivered resources, synthetic
@@ -242,8 +262,10 @@ quota-protocol cases and the relay function as the skill prints it, with stubbed
 agents, not the external catalog's fetch/install path or live worker success.
 None installs the plugin or launches a worker. For local Claude
 development without installation, use
-`claude --plugin-dir /absolute/path/to/t3-workers`; that starts
-an interactive host and is separate from validation.
+`claude --plugin-dir /absolute/path/to/t3-workers`, or
+`claude --plugin-dir /absolute/path/to/t3-workers/plugins/t3-workflow-relay`
+for the relay; each starts an interactive host and is separate from
+validation.
 
 The [architecture](docs/architecture.md) records the packaging decisions,
 primary documentation and remaining live qualification. Contributions should

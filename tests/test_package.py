@@ -33,18 +33,43 @@ class PackageTests(unittest.TestCase):
                 self.assertEqual(portable[key], claude[key])
         self.assertRegex(portable["version"], r"^\d+\.\d+\.\d+(?:-[\w.-]+)?$")
 
+    def test_relay_is_its_own_claude_only_plugin(self):
+        # The relay serves a Claude Code chief inside a T3 thread, the root
+        # plugin an outside chief; they install into different homes.
+        root = ROOT / "plugins" / "t3-workflow-relay"
+        manifest = read_json("plugins/t3-workflow-relay/.claude-plugin/plugin.json")
+        self.assertEqual(manifest["name"], "t3-workflow-relay")
+        self.assertEqual(manifest["version"], read_json("plugin.json")["version"])
+        self.assertFalse((root / "plugin.json").exists())
+        skill = (root / "skills" / manifest["name"] / "SKILL.md").read_text(encoding="utf-8")
+        self.assertRegex(skill, rf"\A---\nname: {re.escape(manifest['name'])}\n")
+        self.assertEqual(
+            sorted(path.name for path in (ROOT / "skills").iterdir() if path.is_dir()),
+            ["t3-workers"],
+        )
+        # A git-subdir install fetches only this directory, so it carries its own license.
+        self.assertEqual((root / "LICENSE").read_bytes(), (ROOT / "LICENSE").read_bytes())
+
     def test_document_links_are_delivered(self):
         # Resolve local Markdown links, including references shipped with the
-        # installed skill. External source availability is not an offline test.
-        documents = [ROOT / "README.md", *ROOT.glob("docs/**/*.md"), *ROOT.glob("skills/**/*.md")]
+        # installed skills. External source availability is not an offline test.
+        documents = [
+            ROOT / "README.md",
+            *ROOT.glob("docs/**/*.md"),
+            *ROOT.glob("skills/**/*.md"),
+            *ROOT.glob("plugins/**/*.md"),
+        ]
         for document in documents:
             for label, destination in re.findall(r"\[([^\]]+)\]\(([^)]+)\)", document.read_text()):
                 parsed = urlsplit(destination.strip("<>"))
                 if parsed.scheme or not parsed.path:
                     continue
                 target = (document.parent / unquote(parsed.path)).resolve()
+                # A plugin under plugins/ is fetched alone, so its links stay inside it.
+                parts = document.relative_to(ROOT).parts
+                bound = ROOT / parts[0] / parts[1] if parts[0] == "plugins" else ROOT
                 with self.subTest(document=str(document.relative_to(ROOT)), link=label):
-                    self.assertTrue(target.is_relative_to(ROOT), f"External local path: {destination}")
+                    self.assertTrue(target.is_relative_to(bound), f"Link leaves its package: {destination}")
                     self.assertTrue(target.is_file(), f"Missing resource: {destination}")
 
 

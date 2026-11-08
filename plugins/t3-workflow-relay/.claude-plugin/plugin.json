@@ -1,0 +1,13 @@
+{
+  "name": "t3-workflow-relay",
+  "version": "0.1.0-alpha.12",
+  "description": "Run any agent of a Claude Code workflow on another T3 account or provider, in its own T3 thread.",
+  "author": {
+    "name": "Tiziano AI",
+    "url": "https://github.com/Tiziano-AI"
+  },
+  "homepage": "https://github.com/Tiziano-AI/t3-workers#mix-t3-workers-into-a-claude-code-workflow",
+  "repository": "https://github.com/Tiziano-AI/t3-workers",
+  "license": "MIT",
+  "keywords": ["t3-code", "agents", "workflow", "claude"]
+}

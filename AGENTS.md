@@ -13,9 +13,13 @@ state. This repository owns the reusable operating method and plugin packaging.
   transport proxy, scheduler, worker registry, credential store or tool catalog.
 - Add helper code only for a demonstrated caller gap and a supported source.
   In particular, a skill does not create a missing structured quota interface.
-- `skills/t3-workflow-relay/` is a Claude-only skill beside it. Claude Code
-  workflow scripts cannot import code and are written per task, so the relay
-  function is text the author pastes; `tests/` runs it as the skill prints it.
+- `plugins/t3-workflow-relay/` is a second, Claude-only plugin with one skill.
+  It serves a Claude Code chief inside a T3 thread, while the root plugin
+  serves an outside chief, so the two install into different homes and the
+  catalog lists them separately. Claude Code workflow scripts cannot import
+  code and are written per task, so the relay function is text the author
+  pastes; `tests/` runs it as the skill prints it. Both plugins share one
+  version and release commit.
 - Keep account, model, effort and workspace choices explicit. Unknown quota is
   not unlimited; spare allowance is not permission to substitute an account.
 - Reconcile uncertain effects before retrying. A wait timeout is not

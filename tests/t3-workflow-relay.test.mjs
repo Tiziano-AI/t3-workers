@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 // Runs the relay helper exactly as the skill prints it, with a stubbed agent().
 // No relay or T3 worker starts, so this says nothing about how T3 behaves live.
-const skill = readFileSync(new URL('../skills/t3-workflow-relay/SKILL.md', import.meta.url), 'utf8');
+const skill = readFileSync(new URL('../plugins/t3-workflow-relay/skills/t3-workflow-relay/SKILL.md', import.meta.url), 'utf8');
 const blocks = [...skill.matchAll(/```js\n([\s\S]*?)```/g)].map((match) => match[1]);
 const helper = blocks.find((block) => block.includes('function t3Agent'));
 const usage = blocks.find((block) => block.includes("phase('Build')"));

@@ -66,9 +66,17 @@ wrapper or second authentication store is needed.
 
 Codex consumes the portable root `plugin.json`; Claude Code uses the thin
 `.claude-plugin/plugin.json`. Both discover the same root `skills/` tree.
-There is no host-specific copy of the operating instructions. The
-`t3-workflow-relay` skill is Claude-only by subject, since Codex has no Workflow
-tool; Codex lists it and has no reason to select it.
+There is no host-specific copy of the operating instructions.
+
+The workflow relay is a second plugin, `plugins/t3-workflow-relay/`, with only
+a Claude Code manifest. It is Claude-only by subject, since Codex has no
+Workflow tool, and it belongs in a different home from the root plugin: the
+relay serves a Claude Code chief inside a T3 thread, where T3's own
+instructions govern delegation, while `t3-workers` serves a chief outside T3
+and launches top-level threads. One plugin carrying both would put the outside
+method into every T3 session. Its installation ID is
+`t3-workflow-relay@tiziano-ai`, from a `git-subdir` catalog source; both
+plugins share one version and release commit.
 
 The publisher marketplace lives in
 [`Tiziano-AI/plugins`](https://github.com/Tiziano-AI/plugins) and is named
@@ -311,5 +319,6 @@ explicitly scoped environment:
 Do not launch paid or stateful qualification as an installation side effect.
 Source tests check package paths, shared metadata and delivered resources;
 they cannot certify these live outcomes. Add tests for a demonstrated defect,
-not a duplicate snapshot of instruction wording. Bump both host manifest
-versions on each distributed change so native caches can select the new copy.
+not a duplicate snapshot of instruction wording. Bump every manifest
+version, the two root host manifests and the relay's, on each distributed
+change so native caches can select the new copy.
