@@ -7,12 +7,15 @@ state. This repository owns the reusable operating method and plugin packaging.
 
 ## Design
 
-- Keep one shared skill and thin, native host manifests. Use current official
+- Keep one shared operating skill and thin, native host manifests. Use current official
   host documentation and released T3 contracts, not a remembered plugin format.
 - Call T3's supported MCP tools directly. Do not add another coordinator,
   transport proxy, scheduler, worker registry, credential store or tool catalog.
 - Add helper code only for a demonstrated caller gap and a supported source.
   In particular, a skill does not create a missing structured quota interface.
+- `skills/t3-workflow-relay/` is a Claude-only skill beside it. Claude Code
+  workflow scripts cannot import code and are written per task, so the relay
+  function is text the author pastes; `tests/` runs it as the skill prints it.
 - Keep account, model, effort and workspace choices explicit. Unknown quota is
   not unlimited; spare allowance is not permission to substitute an account.
 - Reconcile uncertain effects before retrying. A wait timeout is not

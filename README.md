@@ -11,8 +11,9 @@ interrupted assignment without starting over.
 
 Your main agent—the **chief** in this guide—keeps the conversation and assesses
 the result. T3 runs the workers and retains their conversations. This plugin
-provides one shared skill, connection guidance and an optional quota reader;
-it does not run another server or automatically route work between accounts.
+provides one shared skill, connection guidance, an optional quota reader and,
+for Claude Code inside T3, a skill that lets a workflow run any of its agents as
+a T3 worker; it does not run another server or automatically route work between accounts.
 It is an independent Tiziano AI plugin, not a T3 product. Worker operations
 use T3's official MCP directly; the skill adds instructions, not MCP tools.
 
@@ -158,6 +159,34 @@ explains the boundaries and links to released primary sources. The plugin does
 not patch T3, change providers or install a supervisor, memory service or
 polling daemon.
 
+## Mix T3 workers into a Claude Code workflow
+
+A Claude Code chief inside a T3 thread writes its own Workflow scripts. The
+`t3-workflow-relay` skill lets any agent in such a script run as a T3 worker on
+another account or provider, beside native agents: some of them, all of them
+or none. The script stays the chief's own. An agent on the chief's own account
+remains a plain `agent()`.
+
+```js
+const codex = { providerInstanceId: '<provider-instance-id>', model: '<model>',
+                options: { '<option-id>': '<value>' } }
+const built = await t3Agent({ key: 'build', title: 'Build the parser',
+  role: 'implementation', target: codex, out: '/absolute/path/out/build.md',
+  task: 'Read /absolute/path/in/build.md and do what it says.' })
+const verdict = await agent(`Read ${built.out} and try to refute it.`)
+```
+
+Each relay is one cheap Claude agent that makes one `delegate_task` call and
+returns its worker's two status lines. The worker has its own T3 thread and
+its result stays in its file. The skill carries the function to paste into the
+script and the rules that come with it.
+
+**The chief must itself be a Claude Code session running inside a T3 thread, on
+the machine where the output files live,** and it keeps its turn open until the
+last relay has dispatched, because T3 refuses `delegate_task` once that turn has
+ended. For one or two workers, or a worker you will talk to, follow up with or
+inspect as you go, call `delegate_task` directly.
+
 ## Update
 
 For Codex:
@@ -203,14 +232,15 @@ is not an update-repair step.
 
 ```sh
 python3 -m unittest discover -s tests -v
-node --test tests/limits.test.mjs
+node --test tests/limits.test.mjs tests/t3-workflow-relay.test.mjs
 claude plugin validate --strict .
 claude plugin validate --strict .claude-plugin/plugin.json
 ```
 
-These check this repository's manifests, delivered resources and synthetic
-quota-protocol cases, not the external catalog's fetch/install path or live
-worker success. None installs the plugin or launches a worker. For local Claude
+These check this repository's manifests, delivered resources, synthetic
+quota-protocol cases and the relay function as the skill prints it, with stubbed
+agents, not the external catalog's fetch/install path or live worker success.
+None installs the plugin or launches a worker. For local Claude
 development without installation, use
 `claude --plugin-dir /absolute/path/to/t3-workers`; that starts
 an interactive host and is separate from validation.

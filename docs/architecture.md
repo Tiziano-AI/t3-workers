@@ -66,7 +66,9 @@ wrapper or second authentication store is needed.
 
 Codex consumes the portable root `plugin.json`; Claude Code uses the thin
 `.claude-plugin/plugin.json`. Both discover the same root `skills/` tree.
-There is no host-specific copy of the operating instructions.
+There is no host-specific copy of the operating instructions. The
+`t3-workflow-relay` skill is Claude-only by subject, since Codex has no Workflow
+tool; Codex lists it and has no reason to select it.
 
 The publisher marketplace lives in
 [`Tiziano-AI/plugins`](https://github.com/Tiziano-AI/plugins) and is named
@@ -138,6 +140,43 @@ Coverage is native provider-instance snapshots, not pooled Limits panels or
 external usage hubs. No percentages are summed across accounts or providers.
 The installed [quota guide](../skills/t3-workers/references/limits.md) owns
 commands, auth boundaries, fields, exits and exact released source links.
+
+## Relays inside a workflow
+
+A Claude Code Workflow script is a program the host runs inside one chief's
+turn. A relay is one of its agents: it adds no process, service or stored
+state, it uses Claude Code's own workflow runtime and T3's own `delegate_task`
+directly, and T3 still owns every worker.
+
+A workflow can start only Claude agents on the chief's account, so reaching
+another account or provider costs one cheap agent per worker, which makes the
+one call and returns the worker's two status lines. That is a per-agent choice,
+not a workflow shape: stages, fan-out and verification stay in the chief's
+script, and native agents and relays mix freely. An agent on the chief's own
+account gains nothing from a relay.
+
+The function is text in the skill because a script can import nothing and is
+written for one task. The author reads the current text when writing the
+script, and `tests/` runs that same printed text. A saved workflow would fix one
+shape, and a sub-workflow call would add a nesting level for what is one
+function.
+
+The skill's chief is inside T3, which is what separates this route from the
+operating skill's. An outside chief has no calling thread, so it launches
+top-level workers with `t3_thread_launch` and follows them by thread ID. A relay
+makes an internal delegation, which T3 accepts only while the parent's run is
+active: `delegateTask` requires an active run, stricter than the live-caller
+rule other tools use, under which a running background subagent is enough. The
+Workflow tool returns at once, so the chief must stay in its turn until the last
+relay has dispatched. A relay that reaches T3 after the turn has ended gets
+`parent_not_active`, and nothing starts.
+
+The file contract holds only where chief and worker share a filesystem. The
+request ID is honored only within one live T3 session of the parent thread (T3
+scopes it to a session ID that changes after an idle release or a restart), and
+the output guard covers only finished jobs. So before running a job again with a
+task ID and no output file, the chief reads that worker and decides from what
+it finds.
 
 Primary packaging sources:
 
@@ -224,6 +263,28 @@ the person in T3. This qualifies discovery and reporting for that Codex path,
 not the approval outcome, other providers, source-coverage continuity or the
 chief's judgment in future work.
 
+For the relay, `tests/t3-workflow-relay.test.mjs` runs the function exactly as
+the skill prints it, with a stubbed `agent()`: the whole target of each agent
+passes through unchanged, the optional fields appear only when chosen, the
+output guard quotes its path and a relay that returns nothing becomes a row. It
+runs the skill's usage example too. The one-hour wait cap, the `t3-code` tool
+name, the active-run rule and the session scope of the request ID are source
+readings of T3 and of its v0.1.7 server bundle.
+
+On 8 November 2026 a Claude Code chief inside a T3 0.1.7 thread ran a workflow
+built from that printed function: a native agent; then, after the await, a
+relay to a Codex account; then a stage mixing a relay to that Codex account, a
+relay to a second Claude account and a native agent; then a native judge. The
+chief held its turn open with a foreground wait on the output files. Each relay,
+at the default model and effort, started its worker after an earlier stage had
+finished; each worker ran in its own T3 thread on the named account and model
+and wrote its output file; and the judge confirmed the chain. The run was
+repeated with the final text of the function and passed the same way. A relay refused
+after the chief's turn had ended was observed on 5 November 2026 and agrees with
+T3's source; it was not repeated on 8 November. Selection of the skill from an
+installed plugin's listing, `isolation`, `runtimeMode`, a rerun with a raised
+attempt and a wait that timed out were not exercised.
+
 Use the publisher catalog's native installation path to check delivery of this
 package. Isolated package acceptance establishes that the client can install
 its resources, not selection or use in an interactive chief. Do not infer a
@@ -244,6 +305,7 @@ explicitly scoped environment:
 | Human approval | In a supervised harmless write under a mode that asks, the outside chief's wait returns without a terminal run, `pendingRequestCount` is nonzero while the question list is empty, and the chief reports the worker's link, the requested action and what waits on it; the decision stays with the user in T3, and the chief neither answers it nor cancels or narrows the work to remove it. Repeat for each claimed provider; for Cursor, observe how a refusal appears instead. |
 | Source coverage | When a worker's route to required sources is blocked, the result either reaches the same coverage through an authorized equivalent route, reported as such, or carries the narrowed component as still owed through the rebrief, any handoff and the report to the user. |
 | Continuity | A returning chief recovers an existing worker without relaunching. If remote use is claimed, exercise that same chief through the actual remote client. |
+| Workflow relay | A Claude Code chief inside a T3 thread, with the installed skill listed, writes a workflow mixing native agents and relays on named accounts. With its turn held open, each relay dispatches after an `await`, each worker writes its output file in its own T3 thread and the rows report it. A relay that reaches T3 after the turn has ended returns `parent_not_active` and starts nothing. |
 | Package lifecycle | Update loads the new version; disable/uninstall removes the skill without cancelling workers, deleting data or silently revoking another connection. |
 
 Do not launch paid or stateful qualification as an installation side effect.
