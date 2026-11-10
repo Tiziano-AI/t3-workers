@@ -29,6 +29,8 @@ state. This repository owns the reusable operating method and plugin packaging.
 
 ## Source and publication
 
+Follow the shared [release convention](https://github.com/Tiziano-AI/plugins/blob/main/AGENTS.md#release-convention).
+
 This is public source. No personal account mappings, workstation paths,
 credentials, transcripts, raw runtime captures or private deployment details
 belong here. Use portable examples and primary-source links.
